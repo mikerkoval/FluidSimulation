@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Fluid Simulation</title>
+    <link rel="stylesheet" href="src/ui/styles.css">
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="fpsCounter" style="display: block; position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: #0f0; padding: 8px 12px; font-family: monospace; font-size: 14px; border-radius: 4px; z-index: 1000;">FPS: 0</div>
+
+    <div class="controls-panel" id="controlsPanel">
+        <button class="minimize-btn" id="minimizeBtn">−</button>
+        <h2>Fluid Simulation Controls</h2>
+        
+        <div class="panel-content">
+            <!-- Fluid Physics Section -->
+            <div class="settings-category">
+                <h3 class="category-header" data-category="physics">
+                    <span class="category-icon">▼</span>
+                    Fluid Physics
+                </h3>
+                <div class="category-content" data-category-content="physics">
+
+                <div class="control-group">
+                    <label>
+                        Diffusion
+                        <span class="value-display" id="diffuseValue">0.000</span>
+                    </label>
+                    <input type="range" id="diffuseSlider" min="0" max="0.1" step="0.001" value="0">
+                    <p class="info-text">Controls how quickly color spreads through the fluid</p>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Viscosity
+                        <span class="value-display" id="viscosityValue">0.000</span>
+                    </label>
+                    <input type="range" id="viscositySlider" min="0" max="0.1" step="0.001" value="0">
+                    <p class="info-text">Controls fluid thickness (higher = thicker)</p>
+                </div>
+                </div>
+            </div>
+
+            <!-- Interaction Section -->
+            <div class="settings-category">
+                <h3 class="category-header" data-category="interaction">
+                    <span class="category-icon">▼</span>
+                    Interaction
+                </h3>
+                <div class="category-content" data-category-content="interaction">
+
+                <div class="control-group">
+                    <label>
+                        Color Radius
+                        <span class="value-display" id="colorRadiusValue">3</span>
+                    </label>
+                    <input type="range" id="colorRadiusSlider" min="1" max="20" step="1" value="3">
+                    <p class="info-text">Brush size for density injection</p>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Velocity Radius
+                        <span class="value-display" id="velocityRadiusValue">2</span>
+                    </label>
+                    <input type="range" id="velocityRadiusSlider" min="1" max="10" step="1" value="2">
+                    <p class="info-text">Brush size for velocity injection</p>
+                </div>
+                </div>
+            </div>
+
+            <!-- Performance Section -->
+            <div class="settings-category">
+                <h3 class="category-header" data-category="performance">
+                    <span class="category-icon">▼</span>
+                    Performance
+                </h3>
+                <div class="category-content" data-category-content="performance">
+
+                <div class="control-group">
+                    <label>
+                        Grid Size
+                        <span class="value-display" id="gridSizeValue">64</span>
+                    </label>
+                    <input type="range" id="gridSizeSlider" min="64" max="256" step="64" value="64">
+                    <p class="info-text">Simulation resolution (requires reload)</p>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Display Resolution
+                        <span class="value-display" id="displayResolutionValue">256</span>
+                    </label>
+                    <input type="range" id="displayResolutionSlider" min="128" max="1024" step="128" value="256">
+                    <p class="info-text">Canvas resolution (requires reload)</p>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Update Interval (ms)
+                        <span class="value-display" id="updateIntervalValue">16</span>
+                    </label>
+                    <input type="range" id="updateIntervalSlider" min="10" max="100" step="5" value="16">
+                    <p class="info-text">Time step for simulation (~60fps at 16ms)</p>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Solver Iterations
+                        <span class="value-display" id="solverIterationsValue">10</span>
+                    </label>
+                    <input type="range" id="solverIterationsSlider" min="1" max="20" step="1" value="10">
+                    <p class="info-text">Gauss-Seidel iterations (higher = more accurate)</p>
+                </div>
+
+                <div class="control-group">
+                    <label style="margin-bottom: 10px;">Show FPS</label>
+                    <div class="toggle-btn active" id="fpsToggle">
+                        <span>Enabled</span>
+                        <div class="toggle-switch"></div>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <!-- Display Section -->
+            <div class="settings-category">
+                <h3 class="category-header" data-category="display">
+                    <span class="category-icon">▼</span>
+                    Display
+                </h3>
+                <div class="category-content" data-category-content="display">
+
+                <div class="control-group">
+                    <label style="margin-bottom: 10px;">Display Mode</label>
+                    <div class="toggle-btn" id="drawModeToggle">
+                        <span id="drawModeText">Density</span>
+                        <div class="toggle-switch"></div>
+                    </div>
+                    <p class="info-text">Switch between density and velocity visualization</p>
+                </div>
+
+                <div class="control-group">
+                    <label style="margin-bottom: 10px;">Texture Rendering</label>
+                    <div class="toggle-btn active" id="textureDrawToggle">
+                        <span>Enabled</span>
+                        <div class="toggle-switch"></div>
+                    </div>
+                    <p class="info-text">Smooth interpolated rendering vs. raw grid</p>
+                </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button id="pauseBtn">Pause</button>
+                <button class="secondary" id="clearBtn">Clear</button>
+                <button class="reload" id="reloadBtn">Apply & Reload</button>
+            </div>
+
+            <p class="info-text" style="margin-top: 20px; text-align: center;">
+                <strong>Keyboard Shortcuts:</strong><br>
+                P = Pause/Resume | A = Toggle Texture | S = Switch Display Mode
+            </p>
+        </div>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>
