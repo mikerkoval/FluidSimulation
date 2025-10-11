@@ -103,7 +103,6 @@ export function createBuffers(device, GRID_SIZE) {
     ];
     return buffers;
 }
-
 export function createTexture(device, N) {
     const sampler = device.createSampler({
         magFilter: 'linear',
@@ -112,6 +111,8 @@ export function createTexture(device, N) {
 
     // Always create texture at canvas resolution
     const canvas = document.querySelector("canvas");
+
+    console.log('Creating texture at size:', canvas.width, 'x', canvas.height);
 
     const texture = device.createTexture({
         size: { width: canvas.width, height: canvas.height },
@@ -122,3 +123,4 @@ export function createTexture(device, N) {
     });
     return { texture, sampler };
 }
+
