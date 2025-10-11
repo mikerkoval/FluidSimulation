@@ -29,12 +29,12 @@ async function main() {
         const canvas = document.querySelector("canvas");
 
         function resizeCanvas() {
-		// Setup canvas to high resolution square
-		const canvas = document.querySelector("canvas");
-		const resolution = 1024; // High res square
-		canvas.width = resolution;
-		canvas.height = resolution;
-		console.log('Canvas set to:', canvas.width, 'x', canvas.height);
+            // Setup canvas to high resolution square
+            const canvas = document.querySelector("canvas");
+            canvas.width = CONFIG.DISPLAY_RESOLUTION;
+            canvas.height = CONFIG.DISPLAY_RESOLUTION;
+            console.log('Canvas set to:', canvas.width, 'x', canvas.height);
+            console.log('Canvas set to:', canvas.width, 'x', canvas.height);
         }
 
         resizeCanvas();

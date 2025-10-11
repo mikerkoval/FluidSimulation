@@ -63,6 +63,23 @@
                 </label>
                 <input type="range" id="updateIntervalSlider" min="10" max="100" step="5" value="30">
             </div>
+            <div class="control-group">
+                <label>
+                    Solver Iterations
+                    <span class="value-display" id="solverIterationsValue">5</span>
+                </label>
+                <input type="range" id="solverIterationsSlider" min="1" max="20" step="1" value="5">
+                <p class="info-text">Higher = more accurate but slower (requires reload)</p>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Display Resolution
+                    <span class="value-display" id="displayResolutionValue">512</span>
+                </label>
+                <input type="range" id="displayResolutionSlider" min="256" max="2048" step="256" value="512">
+                <p class="info-text">Higher = better quality but slower (requires reload)</p>
+            </div>
 
             <div class="control-group">
                 <label style="margin-bottom: 10px;">Display Mode</label>

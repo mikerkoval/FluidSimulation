@@ -11,7 +11,7 @@ export class UIController {
     loadSettingsFromURL() {
         // Parse URL parameters to restore settings
         const params = new URLSearchParams(window.location.search);
-        
+
         if (params.has('diffuse')) CONFIG.DIFFUSE = parseFloat(params.get('diffuse'));
         if (params.has('viscosity')) CONFIG.VISCOSITY = parseFloat(params.get('viscosity'));
         if (params.has('gridSize')) {
@@ -21,7 +21,9 @@ export class UIController {
         if (params.has('colorRadius')) CONFIG.COLOR_RADIUS = parseInt(params.get('colorRadius'));
         if (params.has('velocityRadius')) CONFIG.VELOCITY_RADIUS = parseInt(params.get('velocityRadius'));
         if (params.has('updateInterval')) CONFIG.UPDATE_INTERVAL = parseInt(params.get('updateInterval'));
-        
+        if (params.has('solverIterations')) CONFIG.SOLVER_ITERATIONS = parseInt(params.get('solverIterations'));
+        if (params.has('displayResolution')) CONFIG.DISPLAY_RESOLUTION = parseInt(params.get('displayResolution'));
+
         // Update STATE to match CONFIG
         STATE.diffuseState = CONFIG.DIFFUSE;
     }
@@ -34,6 +36,8 @@ export class UIController {
         params.set('colorRadius', CONFIG.COLOR_RADIUS);
         params.set('velocityRadius', CONFIG.VELOCITY_RADIUS);
         params.set('updateInterval', CONFIG.UPDATE_INTERVAL);
+        params.set('solverIterations', CONFIG.SOLVER_ITERATIONS);
+        params.set('displayResolution', CONFIG.DISPLAY_RESOLUTION);
         return params.toString();
     }
 
@@ -60,6 +64,10 @@ export class UIController {
             reloadBtn: document.getElementById('reloadBtn'),
             minimizeBtn: document.getElementById('minimizeBtn'),
             controlsPanel: document.getElementById('controlsPanel')
+            solverIterationsSlider: document.getElementById('solverIterationsSlider'),
+            solverIterationsValue: document.getElementById('solverIterationsValue'),
+            displayResolutionSlider: document.getElementById('displayResolutionSlider'),
+            displayResolutionValue: document.getElementById('displayResolutionValue'),
         };
 
         // Set slider values to match current CONFIG
@@ -69,6 +77,8 @@ export class UIController {
         if (this.elements.colorRadiusSlider) this.elements.colorRadiusSlider.value = CONFIG.COLOR_RADIUS;
         if (this.elements.velocityRadiusSlider) this.elements.velocityRadiusSlider.value = CONFIG.VELOCITY_RADIUS;
         if (this.elements.updateIntervalSlider) this.elements.updateIntervalSlider.value = CONFIG.UPDATE_INTERVAL;
+        if (this.elements.solverIterationsSlider) this.elements.solverIterationsSlider.value = CONFIG.SOLVER_ITERATIONS;
+if (this.elements.displayResolutionSlider) this.elements.displayResolutionSlider.value = CONFIG.DISPLAY_RESOLUTION;
 
         // Update all displays
         this.updateAllDisplays();
@@ -81,6 +91,8 @@ export class UIController {
         this.updateSliderDisplay('colorRadius', CONFIG.COLOR_RADIUS);
         this.updateSliderDisplay('velocityRadius', CONFIG.VELOCITY_RADIUS);
         this.updateSliderDisplay('updateInterval', CONFIG.UPDATE_INTERVAL, 'ms');
+        this.updateSliderDisplay('solverIterations', CONFIG.SOLVER_ITERATIONS);
+        this.updateSliderDisplay('displayResolution', CONFIG.DISPLAY_RESOLUTION);
     }
 
     updateSliderDisplay(name, value, suffix = '') {
@@ -165,8 +177,19 @@ export class UIController {
         // Minimize button
         this.elements.minimizeBtn?.addEventListener('click', () => {
             this.elements.controlsPanel?.classList.toggle('minimized');
-            this.elements.minimizeBtn.textContent = 
+            this.elements.minimizeBtn.textContent =
                 this.elements.controlsPanel?.classList.contains('minimized') ? '+' : '−';
+        });
+        // Solver iterations slider
+        this.elements.solverIterationsSlider?.addEventListener('input', (e) => {
+            CONFIG.SOLVER_ITERATIONS = parseInt(e.target.value);
+            this.updateSliderDisplay('solverIterations', e.target.value);
+        });
+
+        // Display resolution slider
+        this.elements.displayResolutionSlider?.addEventListener('input', (e) => {
+            CONFIG.DISPLAY_RESOLUTION = parseInt(e.target.value);
+            this.updateSliderDisplay('displayResolution', e.target.value);
         });
     }
 
@@ -188,7 +211,7 @@ export class UIController {
         const settingsQuery = this.saveSettingsToURL();
         console.log('Reloading with settings:', settingsQuery);
         console.log('New URL will be:', window.location.pathname + '?' + settingsQuery);
-        
+
         // Use location.search instead to properly set query params
         const newURL = window.location.origin + window.location.pathname + '?' + settingsQuery;
         console.log('Full URL:', newURL);
