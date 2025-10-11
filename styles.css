@@ -1,32 +1,23 @@
-#canvas {
-    position: fixed;
-    left: 0;
-    top: 0;
+html, body {
+    margin: 0;
+    padding: 0;
     width: 100%;
     height: 100%;
-}
-
-body {
-    margin: 0;
-    padding: 0;
     overflow: hidden;
-}
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
 }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: #000;
-    overflow: hidden;
 }
 
 #canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     display: block;
-    width: 100vw;
-    height: 100vh;
     cursor: crosshair;
 }
 
