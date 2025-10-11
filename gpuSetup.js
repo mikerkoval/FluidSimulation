@@ -109,10 +109,11 @@ export function createTexture(device, N) {
         minFilter: 'linear',
     });
 
-    // Always create texture at canvas resolution
     const canvas = document.querySelector("canvas");
-
-    console.log('Creating texture at size:', canvas.width, 'x', canvas.height);
+    console.log('Canvas element size:', canvas.width, 'x', canvas.height);
+    console.log('Canvas display size:', canvas.clientWidth, 'x', canvas.clientHeight);
+    console.log('Window size:', window.innerWidth, 'x', window.innerHeight);
+    console.log('CONFIG.N:', N);
 
     const texture = device.createTexture({
         size: { width: canvas.width, height: canvas.height },
