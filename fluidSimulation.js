@@ -318,7 +318,7 @@ export class FluidSimulation {
 
         const encoder = this.device.createCommandEncoder();
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 5; i++) {
             const computePass = encoder.beginComputePass();
             computePass.setPipeline(this.pipelines.diffuse.program);
             computePass.setBindGroup(0, bindGroup);
@@ -391,7 +391,7 @@ export class FluidSimulation {
         });
 
         encoder = this.device.createCommandEncoder();
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 5; i++) {
             computePass = encoder.beginComputePass();
             computePass.setPipeline(this.pipelines.project2.program);
             computePass.setBindGroup(0, bindGroup2);
