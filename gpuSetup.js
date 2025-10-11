@@ -110,12 +110,11 @@ export function createTexture(device, N) {
         minFilter: 'linear',
     });
 
-    // Always create texture at display resolution
+    // Always create texture at canvas resolution
     const canvas = document.querySelector("canvas");
-    const displaySize = 1024;
 
     const texture = device.createTexture({
-        size: { width: displaySize, height: displaySize },
+        size: { width: canvas.width, height: canvas.height },
         format: 'rgba8unorm',
         usage: GPUTextureUsage.COPY_DST |
                GPUTextureUsage.STORAGE_BINDING |

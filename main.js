@@ -35,12 +35,11 @@ async function main() {
         
         // Setup input handlers
         const canvas = document.querySelector("canvas");
-        // Canvas resolution should be reasonable for display
-        const displayRes = 1024;
-        canvas.width = displayRes;
-        canvas.height = displayRes;
-        setupInputHandlers(canvas);
-        
+        // Set canvas resolution to match window size
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        setupInputHandlers(canvas); 
+
         // Initialize UI controls
         console.log('Initializing UI controller...');
         const uiController = initializeUI();
