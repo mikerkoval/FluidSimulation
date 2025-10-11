@@ -1,57 +1,81 @@
 export function createShaderCode(WORKGROUP_SIZE) {
     return {
 	    createTexture: `
-            struct Uniforms {
-                mouse: vec2f,
-                grid_size: vec2f,
-                diff: f32, visc: f32,
-                N: f32, dt: f32, b: f32,
-            };
+    struct Uniforms {
+        mouse: vec2f,
+        grid_size: vec2f,
+        diff: f32, visc: f32,
+        N: f32, dt: f32, b: f32,
+    };
 
-            fn IX(x: u32, y: u32) -> u32 {
-                var grid = uniforms.grid_size;
-                return y * u32(grid.x) + x;
-            }
+    fn IX(x: u32, y: u32) -> u32 {
+        var grid = uniforms.grid_size;
+        return y * u32(grid.x) + x;
+    }
 
-            @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-            @group(0) @binding(1) var out_texture: texture_storage_2d<rgba8unorm, write>;
-            @group(0) @binding(2) var<storage> stateIn: array<vec4f>;
+    @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+    @group(0) @binding(1) var out_texture: texture_storage_2d<rgba8unorm, write>;
+    @group(0) @binding(2) var<storage> stateIn: array<vec4f>;
 
-            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
-            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                let texDims = textureDimensions(out_texture);
+    @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+    fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+        let texDims = textureDimensions(out_texture);
 
-                // Bounds check
-                if (global_id.x >= texDims.x || global_id.y >= texDims.y) {
-                    return;
-                }
+        // Bounds check
+        if (global_id.x >= texDims.x || global_id.y >= texDims.y) {
+            return;
+        }
 
-                // Map texture pixel to simulation grid with fractional coordinates
-                let simX = f32(global_id.x) * uniforms.N / f32(texDims.x);
-                let simY = f32(global_id.y) * uniforms.N / f32(texDims.y);
+        // Calculate aspect ratios
+        let texAspect = f32(texDims.x) / f32(texDims.y);
+        let simAspect = 1.0; // Simulation is always square
 
-                // Bilinear interpolation
-                let x0 = u32(floor(simX));
-                let y0 = u32(floor(simY));
-                let x1 = min(x0 + 1, u32(uniforms.N) - 1);
-                let y1 = min(y0 + 1, u32(uniforms.N) - 1);
+        var simX: f32;
+        var simY: f32;
 
-                let fx = fract(simX);
-                let fy = fract(simY);
+        // Map texture coordinates to simulation grid, handling aspect ratio
+        if (texAspect > simAspect) {
+            // Texture is wider - fit height
+            let scale = f32(texDims.y);
+            let offset = (f32(texDims.x) - scale) / 2.0;
+            simX = (f32(global_id.x) - offset) * uniforms.N / scale;
+            simY = f32(global_id.y) * uniforms.N / f32(texDims.y);
+        } else {
+            // Texture is taller - fit width
+            let scale = f32(texDims.x);
+            let offset = (f32(texDims.y) - scale) / 2.0;
+            simX = f32(global_id.x) * uniforms.N / f32(texDims.x);
+            simY = (f32(global_id.y) - offset) * uniforms.N / scale;
+        }
 
-                let c00 = stateIn[IX(x0 + 1, y0 + 1)];
-                let c10 = stateIn[IX(x1 + 1, y0 + 1)];
-                let c01 = stateIn[IX(x0 + 1, y1 + 1)];
-                let c11 = stateIn[IX(x1 + 1, y1 + 1)];
+        // Clamp to valid simulation bounds
+        if (simX < 0.0 || simX >= uniforms.N || simY < 0.0 || simY >= uniforms.N) {
+            textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), vec4<f32>(0.0, 0.0, 0.0, 1.0));
+            return;
+        }
 
-                // Bilinear blend
-                let c0 = mix(c00, c10, fx);
-                let c1 = mix(c01, c11, fx);
-                let color = mix(c0, c1, fy);
+        // Bilinear interpolation
+        let x0 = u32(floor(simX));
+        let y0 = u32(floor(simY));
+        let x1 = min(x0 + 1, u32(uniforms.N) - 1);
+        let y1 = min(y0 + 1, u32(uniforms.N) - 1);
 
-                textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), vec4<f32>(color.rgb, 1.0));
-            }
-        `,
+        let fx = fract(simX);
+        let fy = fract(simY);
+
+        let c00 = stateIn[IX(x0 + 1, y0 + 1)];
+        let c10 = stateIn[IX(x1 + 1, y0 + 1)];
+        let c01 = stateIn[IX(x0 + 1, y1 + 1)];
+        let c11 = stateIn[IX(x1 + 1, y1 + 1)];
+
+        // Bilinear blend
+        let c0 = mix(c00, c10, fx);
+        let c1 = mix(c01, c11, fx);
+        let color = mix(c0, c1, fy);
+
+        textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), vec4<f32>(color.rgb, 1.0));
+    }
+`,
         drawBuffer: `
             struct VertexInput {
                 @location(0) position: vec2f,
