@@ -6,6 +6,18 @@ import { initializeUI } from './ui.js';
 
 async function main() {
     try {
+        // Setup canvas to match display size FIRST
+        const canvas = document.querySelector("canvas");
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            console.log('Canvas resized to:', canvas.width, 'x', canvas.height);
+        }
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
         // Initialize WebGPU
         const gpuInfo = await initGPU();
         const { device, canvasFormat, context } = gpuInfo;
@@ -34,12 +46,8 @@ async function main() {
         );
         
         // Setup input handlers
-        const canvas = document.querySelector("canvas");
-        // Set canvas resolution to match window size
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        setupInputHandlers(canvas); 
-
+        setupInputHandlers(canvas);
+        
         // Initialize UI controls
         console.log('Initializing UI controller...');
         const uiController = initializeUI();
