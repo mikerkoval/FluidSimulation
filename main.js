@@ -4,9 +4,28 @@ import { createPipelines, FluidSimulation } from './fluidSimulation.js';
 import { setupInputHandlers } from './input.js';
 import { initializeUI } from './ui.js';
 
+// Load settings from URL FIRST, before anything else
+function loadSettingsFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    
+    if (params.has('diffuse')) CONFIG.DIFFUSE = parseFloat(params.get('diffuse'));
+    if (params.has('viscosity')) CONFIG.VISCOSITY = parseFloat(params.get('viscosity'));
+    if (params.has('gridSize')) {
+        CONFIG.N = parseInt(params.get('gridSize'));
+        CONFIG.GRID_SIZE = CONFIG.N + 2;
+    }
+    if (params.has('colorRadius')) CONFIG.COLOR_RADIUS = parseInt(params.get('colorRadius'));
+    if (params.has('velocityRadius')) CONFIG.VELOCITY_RADIUS = parseInt(params.get('velocityRadius'));
+    if (params.has('updateInterval')) CONFIG.UPDATE_INTERVAL = parseInt(params.get('updateInterval'));
+}
+
 async function main() {
     try {
-        // Setup canvas to match display size FIRST
+        // Load URL parameters FIRST
+        loadSettingsFromURL();
+        console.log('Loaded CONFIG.N from URL:', CONFIG.N);
+        
+        // Setup canvas to match display size
         const canvas = document.querySelector("canvas");
         
         function resizeCanvas() {
