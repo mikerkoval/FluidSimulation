@@ -7,6 +7,91 @@
 </head>
 <body>
     <canvas id="canvas" width="4096" height="4096"></canvas>
+    
+    <div class="controls-panel" id="controlsPanel">
+        <button class="minimize-btn" id="minimizeBtn">−</button>
+        <h2>Fluid Simulation Controls</h2>
+        
+        <div class="panel-content">
+            <div class="control-group">
+                <label>
+                    Diffusion
+                    <span class="value-display" id="diffuseValue">0.00</span>
+                </label>
+                <input type="range" id="diffuseSlider" min="0" max="1" step="0.01" value="0">
+                <p class="info-text">Controls how quickly color spreads through the fluid</p>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Viscosity
+                    <span class="value-display" id="viscosityValue">0.00</span>
+                </label>
+                <input type="range" id="viscositySlider" min="0" max="1" step="0.01" value="0">
+                <p class="info-text">Controls fluid thickness (higher = thicker)</p>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Grid Size
+                    <span class="value-display" id="gridSizeValue">512</span>
+                </label>
+                <input type="range" id="gridSizeSlider" min="64" max="1024" step="64" value="512">
+                <p class="info-text">Simulation resolution (requires reload)</p>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Color Radius
+                    <span class="value-display" id="colorRadiusValue">5</span>
+                </label>
+                <input type="range" id="colorRadiusSlider" min="1" max="20" step="1" value="5">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Velocity Radius
+                    <span class="value-display" id="velocityRadiusValue">1</span>
+                </label>
+                <input type="range" id="velocityRadiusSlider" min="1" max="10" step="1" value="1">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Update Interval (ms)
+                    <span class="value-display" id="updateIntervalValue">30</span>
+                </label>
+                <input type="range" id="updateIntervalSlider" min="10" max="100" step="5" value="30">
+            </div>
+
+            <div class="control-group">
+                <label style="margin-bottom: 10px;">Display Mode</label>
+                <div class="toggle-btn" id="drawModeToggle">
+                    <span id="drawModeText">Density</span>
+                    <div class="toggle-switch"></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label style="margin-bottom: 10px;">Texture Draw</label>
+                <div class="toggle-btn active" id="textureDrawToggle">
+                    <span>Enabled</span>
+                    <div class="toggle-switch"></div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button id="pauseBtn">Pause</button>
+                <button class="secondary" id="clearBtn">Clear</button>
+                <button class="reload" id="reloadBtn">Apply & Reload</button>
+            </div>
+
+            <p class="info-text" style="margin-top: 20px; text-align: center;">
+                <strong>Shortcuts:</strong> P = Pause | A = Toggle Texture | S = Switch Mode
+            </p>
+        </div>
+    </div>
+
     <script type="module" src="main.js"></script>
 </body>
 </html>
