@@ -317,7 +317,7 @@ export class FluidSimulation {
 
         const encoder = this.device.createCommandEncoder();
 
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 10; i++) {
             const computePass = encoder.beginComputePass();
             computePass.setPipeline(this.pipelines.diffuse.program);
             computePass.setBindGroup(0, bindGroup);
@@ -390,7 +390,7 @@ export class FluidSimulation {
         });
 
         encoder = this.device.createCommandEncoder();
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 10; i++) {
             computePass = encoder.beginComputePass();
             computePass.setPipeline(this.pipelines.project2.program);
             computePass.setBindGroup(0, bindGroup2);
@@ -500,28 +500,31 @@ export class FluidSimulation {
                     velocityBuffers[STATE.velocityStep % 2]);
     }
 
-    createTextureFromBuffer(buffer) {
-        const bindGroup = this.device.createBindGroup({
-            label: "Create texture bind group",
-            layout: this.pipelines.createTexture.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: this.texture.createView() },
-                { binding: 2, resource: { buffer: buffer } }
-            ]
-        });
+	createTextureFromBuffer(buffer) {
+		const bindGroup = this.device.createBindGroup({
+			label: "Create texture bind group",
+			layout: this.pipelines.createTexture.layout,
+			entries: [
+				{ binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+				{ binding: 1, resource: this.texture.createView() },
+				{ binding: 2, resource: { buffer: buffer } }
+			]
+		});
 
-        const encoder = this.device.createCommandEncoder();
-        const computePass = encoder.beginComputePass();
-        computePass.setPipeline(this.pipelines.createTexture.program);
-        computePass.setBindGroup(0, bindGroup);
-        const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
-        computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
-        computePass.end();
+		const encoder = this.device.createCommandEncoder();
+		const computePass = encoder.beginComputePass();
+		computePass.setPipeline(this.pipelines.createTexture.program);
+		computePass.setBindGroup(0, bindGroup);
 
-        this.device.queue.submit([encoder.finish()]);
-    }
+		// Dispatch to fill the entire canvas-sized texture
+		const canvas = document.querySelector("canvas");
+		const workgroupCountX = Math.ceil(canvas.width / CONFIG.WORKGROUP_SIZE);
+		const workgroupCountY = Math.ceil(canvas.height / CONFIG.WORKGROUP_SIZE);
+		computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+		computePass.end();
 
+		this.device.queue.submit([encoder.finish()]);
+	}
     drawTexture() {
         const bindGroup = this.device.createBindGroup({
             label: "Draw texture bind group",

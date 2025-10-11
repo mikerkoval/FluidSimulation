@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <canvas id="canvas" width="4096" height="4096"></canvas>
+    <canvas id="canvas"></canvas>
     
     <div class="controls-panel" id="controlsPanel">
         <button class="minimize-btn" id="minimizeBtn">−</button>
@@ -34,9 +34,9 @@
             <div class="control-group">
                 <label>
                     Grid Size
-                    <span class="value-display" id="gridSizeValue">512</span>
+		    <span class="value-display" id="gridSizeValue">128</span>
                 </label>
-                <input type="range" id="gridSizeSlider" min="64" max="1024" step="64" value="512">
+		<input type="range" id="gridSizeSlider" min="64" max="512" step="64" value="128">
                 <p class="info-text">Simulation resolution (requires reload)</p>
             </div>
 

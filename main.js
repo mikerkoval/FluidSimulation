@@ -35,10 +35,19 @@ async function main() {
         
         // Setup input handlers
         const canvas = document.querySelector("canvas");
+        // Canvas resolution should be reasonable for display
+        const displayRes = 1024;
+        canvas.width = displayRes;
+        canvas.height = displayRes;
         setupInputHandlers(canvas);
         
         // Initialize UI controls
+        console.log('Initializing UI controller...');
         const uiController = initializeUI();
+        console.log('UI controller created:', uiController);
+        
+        // Make it globally accessible for debugging
+        window.uiController = uiController;
         
         // Connect clear button to simulation
         const clearBtn = document.getElementById('clearBtn');

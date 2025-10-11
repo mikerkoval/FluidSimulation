@@ -1,6 +1,6 @@
 export function createShaderCode(WORKGROUP_SIZE) {
     return {
-        createTexture: `
+	    createTexture: `
             struct Uniforms {
                 mouse: vec2f,
                 grid_size: vec2f,
@@ -19,12 +19,39 @@ export function createShaderCode(WORKGROUP_SIZE) {
 
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                var index = IX(global_id.x+1, global_id.y+1);
-                var color = stateIn[index];
+                let texDims = textureDimensions(out_texture);
+
+                // Bounds check
+                if (global_id.x >= texDims.x || global_id.y >= texDims.y) {
+                    return;
+                }
+
+                // Map texture pixel to simulation grid with fractional coordinates
+                let simX = f32(global_id.x) * uniforms.N / f32(texDims.x);
+                let simY = f32(global_id.y) * uniforms.N / f32(texDims.y);
+
+                // Bilinear interpolation
+                let x0 = u32(floor(simX));
+                let y0 = u32(floor(simY));
+                let x1 = min(x0 + 1, u32(uniforms.N) - 1);
+                let y1 = min(y0 + 1, u32(uniforms.N) - 1);
+
+                let fx = fract(simX);
+                let fy = fract(simY);
+
+                let c00 = stateIn[IX(x0 + 1, y0 + 1)];
+                let c10 = stateIn[IX(x1 + 1, y0 + 1)];
+                let c01 = stateIn[IX(x0 + 1, y1 + 1)];
+                let c11 = stateIn[IX(x1 + 1, y1 + 1)];
+
+                // Bilinear blend
+                let c0 = mix(c00, c10, fx);
+                let c1 = mix(c01, c11, fx);
+                let color = mix(c0, c1, fy);
+
                 textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), vec4<f32>(color.rgb, 1.0));
             }
         `,
-
         drawBuffer: `
             struct VertexInput {
                 @location(0) position: vec2f,

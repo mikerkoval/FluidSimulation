@@ -1,8 +1,8 @@
 export const CONFIG = {
     DIFFUSE: 0.0,
     VISCOSITY: 0,
-    N: 512,
-    GRID_SIZE: 512 + 2,
+    N: 128,              // Changed from 512
+    GRID_SIZE: 130,      // Changed from 514 (N + 2)
     COLOR_RADIUS: 5,
     VELOCITY_RADIUS: 1,
     WORKGROUP_SIZE: 16,

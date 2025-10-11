@@ -3,8 +3,38 @@ import { CONFIG, STATE } from './config.js';
 export class UIController {
     constructor() {
         this.elements = {};
+        this.loadSettingsFromURL();
         this.initializeUI();
         this.attachEventListeners();
+    }
+
+    loadSettingsFromURL() {
+        // Parse URL parameters to restore settings
+        const params = new URLSearchParams(window.location.search);
+        
+        if (params.has('diffuse')) CONFIG.DIFFUSE = parseFloat(params.get('diffuse'));
+        if (params.has('viscosity')) CONFIG.VISCOSITY = parseFloat(params.get('viscosity'));
+        if (params.has('gridSize')) {
+            CONFIG.N = parseInt(params.get('gridSize'));
+            CONFIG.GRID_SIZE = CONFIG.N + 2;
+        }
+        if (params.has('colorRadius')) CONFIG.COLOR_RADIUS = parseInt(params.get('colorRadius'));
+        if (params.has('velocityRadius')) CONFIG.VELOCITY_RADIUS = parseInt(params.get('velocityRadius'));
+        if (params.has('updateInterval')) CONFIG.UPDATE_INTERVAL = parseInt(params.get('updateInterval'));
+        
+        // Update STATE to match CONFIG
+        STATE.diffuseState = CONFIG.DIFFUSE;
+    }
+
+    saveSettingsToURL() {
+        const params = new URLSearchParams();
+        params.set('diffuse', CONFIG.DIFFUSE);
+        params.set('viscosity', CONFIG.VISCOSITY);
+        params.set('gridSize', CONFIG.N);
+        params.set('colorRadius', CONFIG.COLOR_RADIUS);
+        params.set('velocityRadius', CONFIG.VELOCITY_RADIUS);
+        params.set('updateInterval', CONFIG.UPDATE_INTERVAL);
+        return params.toString();
     }
 
     initializeUI() {
@@ -32,7 +62,15 @@ export class UIController {
             controlsPanel: document.getElementById('controlsPanel')
         };
 
-        // Set initial values
+        // Set slider values to match current CONFIG
+        if (this.elements.diffuseSlider) this.elements.diffuseSlider.value = CONFIG.DIFFUSE;
+        if (this.elements.viscositySlider) this.elements.viscositySlider.value = CONFIG.VISCOSITY;
+        if (this.elements.gridSizeSlider) this.elements.gridSizeSlider.value = CONFIG.N;
+        if (this.elements.colorRadiusSlider) this.elements.colorRadiusSlider.value = CONFIG.COLOR_RADIUS;
+        if (this.elements.velocityRadiusSlider) this.elements.velocityRadiusSlider.value = CONFIG.VELOCITY_RADIUS;
+        if (this.elements.updateIntervalSlider) this.elements.updateIntervalSlider.value = CONFIG.UPDATE_INTERVAL;
+
+        // Update all displays
         this.updateAllDisplays();
     }
 
@@ -146,8 +184,15 @@ export class UIController {
             CONFIG.GRID_SIZE = newGridSize + 2;
         }
 
-        // Reload the page to reinitialize with new settings
-        window.location.reload();
+        // Save settings to URL and reload
+        const settingsQuery = this.saveSettingsToURL();
+        console.log('Reloading with settings:', settingsQuery);
+        console.log('New URL will be:', window.location.pathname + '?' + settingsQuery);
+        
+        // Use location.search instead to properly set query params
+        const newURL = window.location.origin + window.location.pathname + '?' + settingsQuery;
+        console.log('Full URL:', newURL);
+        window.location.href = newURL;
     }
 }
 
