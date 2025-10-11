@@ -240,9 +240,10 @@ export class FluidSimulation {
         this.texture = texture;
         this.sampler = sampler;
 
-        const canvas = document.querySelector("canvas");
-        this.width = canvas.clientWidth;
-        this.height = canvas.clientHeight;
+	    const canvas = document.querySelector("canvas");
+	    this.width = canvas.clientWidth;
+	    this.height = canvas.clientHeight;
+	    console.log('Simulation canvas size:', this.width, 'x', this.height);
     }
 
     setUniforms(b) {
