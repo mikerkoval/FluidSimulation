@@ -250,6 +250,54 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
         })
     };
 
+    // Vorticity Pipeline - calculates curl of velocity field
+    const vorticityModule = device.createShaderModule({
+        label: "vorticity shader",
+        code: shaders.vorticity
+    });
+
+    const vorticityLayout = device.createBindGroupLayout({
+        label: "Vorticity Bind Group Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} },
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} }
+        ]
+    });
+
+    pipelines.vorticity = {
+        layout: vorticityLayout,
+        program: device.createComputePipeline({
+            label: "vorticity pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [vorticityLayout] }),
+            compute: { module: vorticityModule, entryPoint: "computeMain" }
+        })
+    };
+
+    // Vorticity Confinement Pipeline - applies vorticity force
+    const vorticityConfinementModule = device.createShaderModule({
+        label: "vorticity confinement shader",
+        code: shaders.vorticityConfinement
+    });
+
+    const vorticityConfinementLayout = device.createBindGroupLayout({
+        label: "Vorticity Confinement Bind Group Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} },
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} }
+        ]
+    });
+
+    pipelines.vorticityConfinement = {
+        layout: vorticityConfinementLayout,
+        program: device.createComputePipeline({
+            label: "vorticity confinement pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [vorticityConfinementLayout] }),
+            compute: { module: vorticityConfinementModule, entryPoint: "computeMain" }
+        })
+    };
+
     return pipelines;
 }
 
@@ -493,6 +541,9 @@ export class FluidSimulation {
 
         this.project(velocityBuffers[STATE.velocityStep % 2],
                      velocityBuffers[(STATE.velocityStep + 1) % 2]);
+
+        // Apply vorticity confinement to add swirling motion
+        this.applyVorticityConfinement(velocityBuffers[STATE.velocityStep % 2]);
     }
 
     fade(buffer) {
@@ -522,6 +573,60 @@ export class FluidSimulation {
 
         computePass.setBindGroup(0, bindGroup);
         const workgroupCount = Math.ceil(CONFIG.GRID_SIZE / CONFIG.WORKGROUP_SIZE);
+        computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
+        computePass.end();
+
+        this.device.queue.submit([encoder.finish()]);
+    }
+
+    applyVorticityConfinement(velocityBuffer) {
+        if (CONFIG.VORTICITY === 0) return;
+
+        const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
+
+        // Set uniforms for vorticity (we'll pass VORTICITY strength via diffuse slot)
+        const uniformArray = new Float32Array([
+            0, 0,  // mouse (not used)
+            CONFIG.GRID_SIZE, CONFIG.GRID_SIZE,
+            CONFIG.VORTICITY, 0,  // vorticity strength in diffuse slot
+            CONFIG.N, CONFIG.UPDATE_INTERVAL / 1000,  // N and dt
+            0, 0  // b not used
+        ]);
+        this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, uniformArray);
+
+        const encoder = this.device.createCommandEncoder();
+
+        // Step 1: Calculate vorticity (curl of velocity field)
+        const vorticityBindGroup = this.device.createBindGroup({
+            label: "Vorticity bind group",
+            layout: this.pipelines.vorticity.layout,
+            entries: [
+                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                { binding: 1, resource: { buffer: velocityBuffer } },
+                { binding: 2, resource: { buffer: this.buffers.curlBuffer } }
+            ]
+        });
+
+        let computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.vorticity.program);
+        computePass.setBindGroup(0, vorticityBindGroup);
+        computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
+        computePass.end();
+
+        // Step 2: Apply vorticity confinement force
+        const confinementBindGroup = this.device.createBindGroup({
+            label: "Vorticity confinement bind group",
+            layout: this.pipelines.vorticityConfinement.layout,
+            entries: [
+                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                { binding: 1, resource: { buffer: velocityBuffer } },
+                { binding: 2, resource: { buffer: this.buffers.curlBuffer } }
+            ]
+        });
+
+        computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.vorticityConfinement.program);
+        computePass.setBindGroup(0, confinementBindGroup);
         computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
         computePass.end();
 

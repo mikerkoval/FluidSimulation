@@ -14,6 +14,8 @@ export class UIController {
 
         if (params.has('diffuse')) CONFIG.DIFFUSE = parseFloat(params.get('diffuse'));
         if (params.has('viscosity')) CONFIG.VISCOSITY = parseFloat(params.get('viscosity'));
+        if (params.has('fade')) CONFIG.FADE = parseFloat(params.get('fade'));
+        if (params.has('vorticity')) CONFIG.VORTICITY = parseFloat(params.get('vorticity'));
         if (params.has('gridSize')) {
             CONFIG.N = parseInt(params.get('gridSize'));
             CONFIG.GRID_SIZE = CONFIG.N + 2;
@@ -32,6 +34,8 @@ export class UIController {
         const params = new URLSearchParams();
         params.set('diffuse', CONFIG.DIFFUSE);
         params.set('viscosity', CONFIG.VISCOSITY);
+        params.set('fade', CONFIG.FADE);
+        params.set('vorticity', CONFIG.VORTICITY);
         params.set('gridSize', CONFIG.N);
         params.set('colorRadius', CONFIG.COLOR_RADIUS);
         params.set('velocityRadius', CONFIG.VELOCITY_RADIUS);
@@ -50,6 +54,8 @@ export class UIController {
             viscosityValue: document.getElementById('viscosityValue'),
             fadeSlider: document.getElementById('fadeSlider'),
             fadeValue: document.getElementById('fadeValue'),
+            vorticitySlider: document.getElementById('vorticitySlider'),
+            vorticityValue: document.getElementById('vorticityValue'),
             gridSizeSlider: document.getElementById('gridSizeSlider'),
             gridSizeValue: document.getElementById('gridSizeValue'),
             colorRadiusSlider: document.getElementById('colorRadiusSlider'),
@@ -76,6 +82,7 @@ export class UIController {
         if (this.elements.diffuseSlider) this.elements.diffuseSlider.value = CONFIG.DIFFUSE;
         if (this.elements.viscositySlider) this.elements.viscositySlider.value = CONFIG.VISCOSITY;
         if (this.elements.fadeSlider) this.elements.fadeSlider.value = CONFIG.FADE;
+        if (this.elements.vorticitySlider) this.elements.vorticitySlider.value = CONFIG.VORTICITY;
         if (this.elements.gridSizeSlider) this.elements.gridSizeSlider.value = CONFIG.N;
         if (this.elements.colorRadiusSlider) this.elements.colorRadiusSlider.value = CONFIG.COLOR_RADIUS;
         if (this.elements.velocityRadiusSlider) this.elements.velocityRadiusSlider.value = CONFIG.VELOCITY_RADIUS;
@@ -91,6 +98,7 @@ export class UIController {
         this.updateSliderDisplay('diffuse', CONFIG.DIFFUSE.toFixed(3));
         this.updateSliderDisplay('viscosity', CONFIG.VISCOSITY.toFixed(3));
         this.updateSliderDisplay('fade', CONFIG.FADE.toFixed(3));
+        this.updateSliderDisplay('vorticity', CONFIG.VORTICITY.toFixed(3));
         this.updateSliderDisplay('gridSize', CONFIG.N);
         this.updateSliderDisplay('colorRadius', CONFIG.COLOR_RADIUS);
         this.updateSliderDisplay('velocityRadius', CONFIG.VELOCITY_RADIUS);
@@ -124,6 +132,12 @@ export class UIController {
         this.elements.fadeSlider?.addEventListener('input', (e) => {
             CONFIG.FADE = parseFloat(e.target.value);
             this.updateSliderDisplay('fade', parseFloat(e.target.value).toFixed(3));
+        });
+
+        // Vorticity slider
+        this.elements.vorticitySlider?.addEventListener('input', (e) => {
+            CONFIG.VORTICITY = parseFloat(e.target.value);
+            this.updateSliderDisplay('vorticity', parseFloat(e.target.value).toFixed(3));
         });
 
         // Grid size slider

@@ -3,15 +3,16 @@ export const CONFIG = {
     VISCOSITY: 0,
     N: 64,
     GRID_SIZE: 66,
-    COLOR_RADIUS: 5,
-    VELOCITY_RADIUS: 1,
+    COLOR_RADIUS: 3,  // Smaller radius for 64 grid
+    VELOCITY_RADIUS: 2,  // Slightly larger for better flow
     WORKGROUP_SIZE: 16,
-    UPDATE_INTERVAL: 30,
+    UPDATE_INTERVAL: 16,  // Faster updates for smoother animation (~60fps)
     DRAW_DENSITY: 1,
     DRAW_VELOCITY: 2,
-    SOLVER_ITERATIONS: 5,
+    SOLVER_ITERATIONS: 10,  // More iterations for better quality at 64 grid
     DISPLAY_RESOLUTION: 512,
-    FADE: 0.99,  // 1.0 = no fade, lower = faster fade
+    FADE: 0.98,  // Slightly faster fade for better visual
+    VORTICITY: 0.5,  // Higher vorticity for more pronounced swirls
     // Auto-adjust update interval based on grid size for performance
     getAdaptiveUpdateInterval() {
         if (this.N <= 64) return this.UPDATE_INTERVAL;

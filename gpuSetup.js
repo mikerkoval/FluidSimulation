@@ -105,11 +105,19 @@ export function createBuffers(device, GRID_SIZE) {
         })
     ];
 
+    // Create curl buffer for vorticity confinement
+    buffers.curlBuffer = device.createBuffer({
+        label: "Curl Buffer",
+        size: stateArray.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
     // Initialize all buffers to zero
     device.queue.writeBuffer(buffers.densityBuffers[0], 0, stateArray);
     device.queue.writeBuffer(buffers.densityBuffers[1], 0, stateArray);
     device.queue.writeBuffer(buffers.velocityBuffers[0], 0, stateArray);
     device.queue.writeBuffer(buffers.velocityBuffers[1], 0, stateArray);
+    device.queue.writeBuffer(buffers.curlBuffer, 0, stateArray);
 
     return buffers;
 }

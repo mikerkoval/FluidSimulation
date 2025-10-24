@@ -34,50 +34,59 @@
             <div class="control-group">
                 <label>
                     Fade
-                    <span class="value-display" id="fadeValue">0.990</span>
+                    <span class="value-display" id="fadeValue">0.980</span>
                 </label>
-                <input type="range" id="fadeSlider" min="0.90" max="1.0" step="0.001" value="0.99">
+                <input type="range" id="fadeSlider" min="0.90" max="1.0" step="0.001" value="0.98">
                 <p class="info-text">Controls how quickly colors fade (1.0 = no fade)</p>
             </div>
 
             <div class="control-group">
                 <label>
-                    Grid Size
-		    <span class="value-display" id="gridSizeValue">128</span>
+                    Vorticity
+                    <span class="value-display" id="vorticityValue">0.500</span>
                 </label>
-		<input type="range" id="gridSizeSlider" min="64" max="512" step="64" value="128">
+                <input type="range" id="vorticitySlider" min="0" max="1.0" step="0.05" value="0.5">
+                <p class="info-text">Enhances swirling patterns (higher = more swirls)</p>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Grid Size
+		    <span class="value-display" id="gridSizeValue">64</span>
+                </label>
+		<input type="range" id="gridSizeSlider" min="64" max="512" step="64" value="64">
                 <p class="info-text">Simulation resolution (requires reload)</p>
             </div>
 
             <div class="control-group">
                 <label>
                     Color Radius
-                    <span class="value-display" id="colorRadiusValue">5</span>
+                    <span class="value-display" id="colorRadiusValue">3</span>
                 </label>
-                <input type="range" id="colorRadiusSlider" min="1" max="20" step="1" value="5">
+                <input type="range" id="colorRadiusSlider" min="1" max="20" step="1" value="3">
             </div>
 
             <div class="control-group">
                 <label>
                     Velocity Radius
-                    <span class="value-display" id="velocityRadiusValue">1</span>
+                    <span class="value-display" id="velocityRadiusValue">2</span>
                 </label>
-                <input type="range" id="velocityRadiusSlider" min="1" max="10" step="1" value="1">
+                <input type="range" id="velocityRadiusSlider" min="1" max="10" step="1" value="2">
             </div>
 
             <div class="control-group">
                 <label>
                     Update Interval (ms)
-                    <span class="value-display" id="updateIntervalValue">30</span>
+                    <span class="value-display" id="updateIntervalValue">16</span>
                 </label>
-                <input type="range" id="updateIntervalSlider" min="10" max="100" step="5" value="30">
+                <input type="range" id="updateIntervalSlider" min="10" max="100" step="5" value="16">
             </div>
             <div class="control-group">
                 <label>
                     Solver Iterations
-                    <span class="value-display" id="solverIterationsValue">5</span>
+                    <span class="value-display" id="solverIterationsValue">10</span>
                 </label>
-                <input type="range" id="solverIterationsSlider" min="1" max="20" step="1" value="5">
+                <input type="range" id="solverIterationsSlider" min="1" max="20" step="1" value="10">
                 <p class="info-text">Higher = more accurate but slower (requires reload)</p>
             </div>
 

@@ -448,6 +448,92 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 // Fade factor is stored in diffuse uniform (we'll reuse it)
                 density[index] *= uniforms.diffuse;
             }
+        `,
+
+        // Vorticity calculation - computes curl of velocity field
+        vorticity: `
+            struct Uniforms {
+                mouse: vec2f,
+                grid_size: vec2f,
+                diffuse: f32, viscosity: f32,
+                N: f32, dt: f32, b: f32,
+            };
+
+            @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+            @group(0) @binding(1) var<storage> velocity: array<vec4f>;
+            @group(0) @binding(2) var<storage, read_write> curl: array<vec4f>;
+
+            fn IX(x: u32, y: u32) -> u32 {
+                var grid = uniforms.grid_size;
+                return y * u32(grid.x) + x;
+            }
+
+            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                var i = global_id.x + 1;
+                var j = global_id.y + 1;
+
+                if(f32(i) >= uniforms.N + 1) { return; }
+                if(f32(j) >= uniforms.N + 1) { return; }
+
+                // Calculate curl (vorticity) = dv/dx - du/dy
+                var dudy = (velocity[IX(i, j+1)].x - velocity[IX(i, j-1)].x) * 0.5;
+                var dvdx = (velocity[IX(i+1, j)].y - velocity[IX(i-1, j)].y) * 0.5;
+
+                // Store curl in x component (it's a scalar in 2D)
+                curl[IX(i, j)].x = dvdx - dudy;
+            }
+        `,
+
+        // Vorticity confinement - applies force to enhance vortices
+        vorticityConfinement: `
+            struct Uniforms {
+                mouse: vec2f,
+                grid_size: vec2f,
+                diffuse: f32, viscosity: f32,
+                N: f32, dt: f32, b: f32,
+            };
+
+            @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+            @group(0) @binding(1) var<storage, read_write> velocity: array<vec4f>;
+            @group(0) @binding(2) var<storage> curl: array<vec4f>;
+
+            fn IX(x: u32, y: u32) -> u32 {
+                var grid = uniforms.grid_size;
+                return y * u32(grid.x) + x;
+            }
+
+            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                var i = global_id.x + 1;
+                var j = global_id.y + 1;
+
+                if(f32(i) >= uniforms.N + 1) { return; }
+                if(f32(j) >= uniforms.N + 1) { return; }
+
+                // Get curl magnitude at neighboring cells
+                var curlL = abs(curl[IX(i-1, j)].x);
+                var curlR = abs(curl[IX(i+1, j)].x);
+                var curlB = abs(curl[IX(i, j-1)].x);
+                var curlT = abs(curl[IX(i, j+1)].x);
+                var curlC = curl[IX(i, j)].x;
+
+                // Calculate gradient of curl magnitude
+                var dx = (curlR - curlL) * 0.5;
+                var dy = (curlT - curlB) * 0.5;
+
+                // Normalize the gradient
+                var len = sqrt(dx*dx + dy*dy) + 1e-5;
+                dx /= len;
+                dy /= len;
+
+                // Vorticity confinement force (stored in diffuse uniform as strength)
+                var strength = uniforms.diffuse;
+
+                // Apply force perpendicular to gradient, in direction of curl
+                velocity[IX(i, j)].x += dy * curlC * strength * uniforms.dt;
+                velocity[IX(i, j)].y += -dx * curlC * strength * uniforms.dt;
+            }
         `
     };
 }
