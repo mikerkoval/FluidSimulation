@@ -227,6 +227,29 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
         })
     };
 
+    // Fade Pipeline
+    const fadeModule = device.createShaderModule({
+        label: "fade shader",
+        code: shaders.fade
+    });
+
+    const fadeLayout = device.createBindGroupLayout({
+        label: "Fade Bind Group Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} }
+        ]
+    });
+
+    pipelines.fade = {
+        layout: fadeLayout,
+        program: device.createComputePipeline({
+            label: "fade pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [fadeLayout] }),
+            compute: { module: fadeModule, entryPoint: "computeMain" }
+        })
+    };
+
     return pipelines;
 }
 
@@ -472,6 +495,39 @@ export class FluidSimulation {
                      velocityBuffers[(STATE.velocityStep + 1) % 2]);
     }
 
+    fade(buffer) {
+        // Apply fade effect by multiplying density by fade factor
+        // We need to set the fade factor in the diffuse uniform temporarily
+        const uniformArray = new Float32Array([
+            0, 0,  // mouse (not used)
+            CONFIG.GRID_SIZE, CONFIG.GRID_SIZE,
+            CONFIG.FADE, 0,  // Use fade value in diffuse slot
+            CONFIG.N, 0,  // dt not used
+            0, 0  // b not used
+        ]);
+        this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, uniformArray);
+
+        const encoder = this.device.createCommandEncoder();
+        const computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.fade.program);
+
+        const bindGroup = this.device.createBindGroup({
+            label: "Fade bind group",
+            layout: this.pipelines.fade.layout,
+            entries: [
+                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                { binding: 1, resource: { buffer: buffer } }
+            ]
+        });
+
+        computePass.setBindGroup(0, bindGroup);
+        const workgroupCount = Math.ceil(CONFIG.GRID_SIZE / CONFIG.WORKGROUP_SIZE);
+        computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
+        computePass.end();
+
+        this.device.queue.submit([encoder.finish()]);
+    }
+
     updateDensity() {
         STATE.diffuseState = CONFIG.DIFFUSE;
         const densityBuffers = this.buffers.densityBuffers;
@@ -500,6 +556,11 @@ export class FluidSimulation {
                 this.buffers.addDensityBuffer
             );
             STATE.densityStep = (STATE.densityStep + 1) % 2;
+        }
+
+        // Apply fade effect
+        if (CONFIG.FADE < 1.0) {
+            this.fade(densityBuffers[STATE.densityStep % 2]);
         }
 
         // Always diffuse - the solver will be fast when diffusion is 0

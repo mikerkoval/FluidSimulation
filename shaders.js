@@ -421,6 +421,33 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 uv[IX(i,j)].x -= 1.0*(p_div[IX(i+1,j)].x-p_div[IX(i-1,j)].x)/h;
                 uv[IX(i,j)].y -= 1.0*(p_div[IX(i,j+1)].x-p_div[IX(i,j-1)].x)/h;
             }
+        `,
+
+        fade: `
+            struct Uniforms {
+                mouse: vec2f,
+                grid_size: vec2f,
+                diffuse: f32, viscosity: f32,
+                N: f32, dt: f32, b: f32,
+            };
+
+            @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+            @group(0) @binding(1) var<storage, read_write> density: array<vec4f>;
+
+            fn IX(x: u32, y: u32) -> u32 {
+                var grid = uniforms.grid_size;
+                return y * u32(grid.x) + x;
+            }
+
+            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                if(f32(global_id.x) >= uniforms.grid_size.x) { return; }
+                if(f32(global_id.y) >= uniforms.grid_size.y) { return; }
+
+                var index = IX(global_id.x, global_id.y);
+                // Fade factor is stored in diffuse uniform (we'll reuse it)
+                density[index] *= uniforms.diffuse;
+            }
         `
     };
 }

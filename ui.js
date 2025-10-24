@@ -48,6 +48,8 @@ export class UIController {
             diffuseValue: document.getElementById('diffuseValue'),
             viscositySlider: document.getElementById('viscositySlider'),
             viscosityValue: document.getElementById('viscosityValue'),
+            fadeSlider: document.getElementById('fadeSlider'),
+            fadeValue: document.getElementById('fadeValue'),
             gridSizeSlider: document.getElementById('gridSizeSlider'),
             gridSizeValue: document.getElementById('gridSizeValue'),
             colorRadiusSlider: document.getElementById('colorRadiusSlider'),
@@ -73,6 +75,7 @@ export class UIController {
         // Set slider values to match current CONFIG
         if (this.elements.diffuseSlider) this.elements.diffuseSlider.value = CONFIG.DIFFUSE;
         if (this.elements.viscositySlider) this.elements.viscositySlider.value = CONFIG.VISCOSITY;
+        if (this.elements.fadeSlider) this.elements.fadeSlider.value = CONFIG.FADE;
         if (this.elements.gridSizeSlider) this.elements.gridSizeSlider.value = CONFIG.N;
         if (this.elements.colorRadiusSlider) this.elements.colorRadiusSlider.value = CONFIG.COLOR_RADIUS;
         if (this.elements.velocityRadiusSlider) this.elements.velocityRadiusSlider.value = CONFIG.VELOCITY_RADIUS;
@@ -85,8 +88,9 @@ export class UIController {
     }
 
     updateAllDisplays() {
-        this.updateSliderDisplay('diffuse', CONFIG.DIFFUSE);
-        this.updateSliderDisplay('viscosity', CONFIG.VISCOSITY);
+        this.updateSliderDisplay('diffuse', CONFIG.DIFFUSE.toFixed(3));
+        this.updateSliderDisplay('viscosity', CONFIG.VISCOSITY.toFixed(3));
+        this.updateSliderDisplay('fade', CONFIG.FADE.toFixed(3));
         this.updateSliderDisplay('gridSize', CONFIG.N);
         this.updateSliderDisplay('colorRadius', CONFIG.COLOR_RADIUS);
         this.updateSliderDisplay('velocityRadius', CONFIG.VELOCITY_RADIUS);
@@ -107,13 +111,19 @@ export class UIController {
         this.elements.diffuseSlider?.addEventListener('input', (e) => {
             CONFIG.DIFFUSE = parseFloat(e.target.value);
             STATE.diffuseState = CONFIG.DIFFUSE;
-            this.updateSliderDisplay('diffuse', e.target.value);
+            this.updateSliderDisplay('diffuse', parseFloat(e.target.value).toFixed(3));
         });
 
         // Viscosity slider
         this.elements.viscositySlider?.addEventListener('input', (e) => {
             CONFIG.VISCOSITY = parseFloat(e.target.value);
-            this.updateSliderDisplay('viscosity', e.target.value);
+            this.updateSliderDisplay('viscosity', parseFloat(e.target.value).toFixed(3));
+        });
+
+        // Fade slider
+        this.elements.fadeSlider?.addEventListener('input', (e) => {
+            CONFIG.FADE = parseFloat(e.target.value);
+            this.updateSliderDisplay('fade', parseFloat(e.target.value).toFixed(3));
         });
 
         // Grid size slider

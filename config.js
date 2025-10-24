@@ -11,6 +11,7 @@ export const CONFIG = {
     DRAW_VELOCITY: 2,
     SOLVER_ITERATIONS: 5,
     DISPLAY_RESOLUTION: 512,
+    FADE: 0.99,  // 1.0 = no fade, lower = faster fade
     // Auto-adjust update interval based on grid size for performance
     getAdaptiveUpdateInterval() {
         if (this.N <= 64) return this.UPDATE_INTERVAL;
