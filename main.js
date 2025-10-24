@@ -51,7 +51,7 @@ async function main() {
         const buffers = createBuffers(device, CONFIG.GRID_SIZE);
 
         // Create texture and sampler
-        const { texture, sampler } = createTexture(device, CONFIG.N);
+        const { texture, sampler, bloomTexture1, bloomTexture2, renderTexture } = createTexture(device, CONFIG.N);
 
         // Create all pipelines
         const pipelines = createPipelines(device, canvasFormat, squareInfo.vertexBufferLayout);
@@ -64,7 +64,10 @@ async function main() {
             pipelines,
             squareInfo.vertexBuffer,
             texture,
-            sampler
+            sampler,
+            bloomTexture1,
+            bloomTexture2,
+            renderTexture
         );
 
         // Setup input handlers
@@ -86,10 +89,16 @@ async function main() {
             });
         }
 
-        // Start simulation loop with adaptive interval for performance
-        const updateInterval = CONFIG.getAdaptiveUpdateInterval();
-        console.log('Update interval:', updateInterval, 'ms for grid size', CONFIG.N);
-        setInterval(() => simulation.run(), updateInterval);
+        // Start simulation loop using requestAnimationFrame for proper GPU synchronization
+        console.log('Starting animation loop for grid size', CONFIG.N);
+
+        function animate() {
+            simulation.run();
+            requestAnimationFrame(animate);
+        }
+
+        // Start the animation loop
+        requestAnimationFrame(animate);
 
         console.log('Fluid simulation started successfully!');
         console.log('UI controls initialized');

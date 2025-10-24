@@ -13,6 +13,12 @@ export const CONFIG = {
     DISPLAY_RESOLUTION: 512,
     FADE: 0.98,  // Slightly faster fade for better visual
     VORTICITY: 0.5,  // Higher vorticity for more pronounced swirls
+    BLOOM_INTENSITY: 0.4,  // Bloom glow strength (0 = off, higher = more glow)
+    BLOOM_THRESHOLD: 0.7,  // Brightness threshold for bloom (0-1)
+    ENABLE_BLOOM: true,  // Toggle bloom effect on/off
+    ENABLE_VORTICITY: true,  // Toggle vorticity confinement on/off
+    ENABLE_FADE: true,  // Toggle fade effect on/off
+    SHOW_FPS: false,  // Toggle FPS counter display
     // Auto-adjust update interval based on grid size for performance
     getAdaptiveUpdateInterval() {
         if (this.N <= 64) return this.UPDATE_INTERVAL;
@@ -37,5 +43,9 @@ export const STATE = {
     step: 0,
     densityStep: 0,
     velocityStep: 0,
-    mousePosition: { x: 0, y: 0, x0: 0, y0: 0 }
+    mousePosition: { x: 0, y: 0, x0: 0, y0: 0 },
+    // FPS tracking
+    frameCount: 0,
+    lastFpsTime: performance.now(),
+    currentFps: 0
 };

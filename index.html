@@ -7,7 +7,8 @@
 </head>
 <body>
     <canvas id="canvas"></canvas>
-    
+    <div id="fpsCounter" style="display: none; position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: #0f0; padding: 8px 12px; font-family: monospace; font-size: 14px; border-radius: 4px; z-index: 1000;">FPS: 0</div>
+
     <div class="controls-panel" id="controlsPanel">
         <button class="minimize-btn" id="minimizeBtn">−</button>
         <h2>Fluid Simulation Controls</h2>
@@ -47,6 +48,24 @@
                 </label>
                 <input type="range" id="vorticitySlider" min="0" max="1.0" step="0.05" value="0.5">
                 <p class="info-text">Enhances swirling patterns (higher = more swirls)</p>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Bloom Intensity
+                    <span class="value-display" id="bloomIntensityValue">0.400</span>
+                </label>
+                <input type="range" id="bloomIntensitySlider" min="0" max="1.0" step="0.05" value="0.4">
+                <p class="info-text">Glow effect strength (0 = off, higher = more glow)</p>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Bloom Threshold
+                    <span class="value-display" id="bloomThresholdValue">0.700</span>
+                </label>
+                <input type="range" id="bloomThresholdSlider" min="0" max="1.0" step="0.05" value="0.7">
+                <p class="info-text">Brightness threshold for bloom (lower = more glow)</p>
             </div>
 
             <div class="control-group">
@@ -111,6 +130,38 @@
                 <label style="margin-bottom: 10px;">Texture Draw</label>
                 <div class="toggle-btn active" id="textureDrawToggle">
                     <span>Enabled</span>
+                    <div class="toggle-switch"></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label style="margin-bottom: 10px;">Bloom Effect</label>
+                <div class="toggle-btn active" id="bloomToggle">
+                    <span>Enabled</span>
+                    <div class="toggle-switch"></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label style="margin-bottom: 10px;">Vorticity Confinement</label>
+                <div class="toggle-btn active" id="vorticityToggle">
+                    <span>Enabled</span>
+                    <div class="toggle-switch"></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label style="margin-bottom: 10px;">Fade Effect</label>
+                <div class="toggle-btn active" id="fadeToggle">
+                    <span>Enabled</span>
+                    <div class="toggle-switch"></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label style="margin-bottom: 10px;">Show FPS</label>
+                <div class="toggle-btn" id="fpsToggle">
+                    <span>Disabled</span>
                     <div class="toggle-switch"></div>
                 </div>
             </div>

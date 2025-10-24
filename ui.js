@@ -16,6 +16,8 @@ export class UIController {
         if (params.has('viscosity')) CONFIG.VISCOSITY = parseFloat(params.get('viscosity'));
         if (params.has('fade')) CONFIG.FADE = parseFloat(params.get('fade'));
         if (params.has('vorticity')) CONFIG.VORTICITY = parseFloat(params.get('vorticity'));
+        if (params.has('bloomIntensity')) CONFIG.BLOOM_INTENSITY = parseFloat(params.get('bloomIntensity'));
+        if (params.has('bloomThreshold')) CONFIG.BLOOM_THRESHOLD = parseFloat(params.get('bloomThreshold'));
         if (params.has('gridSize')) {
             CONFIG.N = parseInt(params.get('gridSize'));
             CONFIG.GRID_SIZE = CONFIG.N + 2;
@@ -36,6 +38,8 @@ export class UIController {
         params.set('viscosity', CONFIG.VISCOSITY);
         params.set('fade', CONFIG.FADE);
         params.set('vorticity', CONFIG.VORTICITY);
+        params.set('bloomIntensity', CONFIG.BLOOM_INTENSITY);
+        params.set('bloomThreshold', CONFIG.BLOOM_THRESHOLD);
         params.set('gridSize', CONFIG.N);
         params.set('colorRadius', CONFIG.COLOR_RADIUS);
         params.set('velocityRadius', CONFIG.VELOCITY_RADIUS);
@@ -56,6 +60,10 @@ export class UIController {
             fadeValue: document.getElementById('fadeValue'),
             vorticitySlider: document.getElementById('vorticitySlider'),
             vorticityValue: document.getElementById('vorticityValue'),
+            bloomIntensitySlider: document.getElementById('bloomIntensitySlider'),
+            bloomIntensityValue: document.getElementById('bloomIntensityValue'),
+            bloomThresholdSlider: document.getElementById('bloomThresholdSlider'),
+            bloomThresholdValue: document.getElementById('bloomThresholdValue'),
             gridSizeSlider: document.getElementById('gridSizeSlider'),
             gridSizeValue: document.getElementById('gridSizeValue'),
             colorRadiusSlider: document.getElementById('colorRadiusSlider'),
@@ -76,6 +84,11 @@ export class UIController {
             solverIterationsValue: document.getElementById('solverIterationsValue'),
             displayResolutionSlider: document.getElementById('displayResolutionSlider'),
             displayResolutionValue: document.getElementById('displayResolutionValue'),
+            bloomToggle: document.getElementById('bloomToggle'),
+            vorticityToggle: document.getElementById('vorticityToggle'),
+            fadeToggle: document.getElementById('fadeToggle'),
+            fpsToggle: document.getElementById('fpsToggle'),
+            fpsCounter: document.getElementById('fpsCounter'),
         };
 
         // Set slider values to match current CONFIG
@@ -83,6 +96,8 @@ export class UIController {
         if (this.elements.viscositySlider) this.elements.viscositySlider.value = CONFIG.VISCOSITY;
         if (this.elements.fadeSlider) this.elements.fadeSlider.value = CONFIG.FADE;
         if (this.elements.vorticitySlider) this.elements.vorticitySlider.value = CONFIG.VORTICITY;
+        if (this.elements.bloomIntensitySlider) this.elements.bloomIntensitySlider.value = CONFIG.BLOOM_INTENSITY;
+        if (this.elements.bloomThresholdSlider) this.elements.bloomThresholdSlider.value = CONFIG.BLOOM_THRESHOLD;
         if (this.elements.gridSizeSlider) this.elements.gridSizeSlider.value = CONFIG.N;
         if (this.elements.colorRadiusSlider) this.elements.colorRadiusSlider.value = CONFIG.COLOR_RADIUS;
         if (this.elements.velocityRadiusSlider) this.elements.velocityRadiusSlider.value = CONFIG.VELOCITY_RADIUS;
@@ -99,6 +114,8 @@ export class UIController {
         this.updateSliderDisplay('viscosity', CONFIG.VISCOSITY.toFixed(3));
         this.updateSliderDisplay('fade', CONFIG.FADE.toFixed(3));
         this.updateSliderDisplay('vorticity', CONFIG.VORTICITY.toFixed(3));
+        this.updateSliderDisplay('bloomIntensity', CONFIG.BLOOM_INTENSITY.toFixed(3));
+        this.updateSliderDisplay('bloomThreshold', CONFIG.BLOOM_THRESHOLD.toFixed(3));
         this.updateSliderDisplay('gridSize', CONFIG.N);
         this.updateSliderDisplay('colorRadius', CONFIG.COLOR_RADIUS);
         this.updateSliderDisplay('velocityRadius', CONFIG.VELOCITY_RADIUS);
@@ -138,6 +155,18 @@ export class UIController {
         this.elements.vorticitySlider?.addEventListener('input', (e) => {
             CONFIG.VORTICITY = parseFloat(e.target.value);
             this.updateSliderDisplay('vorticity', parseFloat(e.target.value).toFixed(3));
+        });
+
+        // Bloom intensity slider
+        this.elements.bloomIntensitySlider?.addEventListener('input', (e) => {
+            CONFIG.BLOOM_INTENSITY = parseFloat(e.target.value);
+            this.updateSliderDisplay('bloomIntensity', parseFloat(e.target.value).toFixed(3));
+        });
+
+        // Bloom threshold slider
+        this.elements.bloomThresholdSlider?.addEventListener('input', (e) => {
+            CONFIG.BLOOM_THRESHOLD = parseFloat(e.target.value);
+            this.updateSliderDisplay('bloomThreshold', parseFloat(e.target.value).toFixed(3));
         });
 
         // Grid size slider
@@ -214,6 +243,49 @@ export class UIController {
         this.elements.displayResolutionSlider?.addEventListener('input', (e) => {
             CONFIG.DISPLAY_RESOLUTION = parseInt(e.target.value);
             this.updateSliderDisplay('displayResolution', e.target.value);
+        });
+
+        // Bloom toggle
+        this.elements.bloomToggle?.addEventListener('click', () => {
+            CONFIG.ENABLE_BLOOM = !CONFIG.ENABLE_BLOOM;
+            this.elements.bloomToggle.classList.toggle('active');
+            const span = this.elements.bloomToggle.querySelector('span');
+            if (span) span.textContent = CONFIG.ENABLE_BLOOM ? 'Enabled' : 'Disabled';
+        });
+
+        // Vorticity toggle
+        this.elements.vorticityToggle?.addEventListener('click', () => {
+            CONFIG.ENABLE_VORTICITY = !CONFIG.ENABLE_VORTICITY;
+            this.elements.vorticityToggle.classList.toggle('active');
+            const span = this.elements.vorticityToggle.querySelector('span');
+            if (span) span.textContent = CONFIG.ENABLE_VORTICITY ? 'Enabled' : 'Disabled';
+        });
+
+        // Fade toggle
+        this.elements.fadeToggle?.addEventListener('click', () => {
+            CONFIG.ENABLE_FADE = !CONFIG.ENABLE_FADE;
+            this.elements.fadeToggle.classList.toggle('active');
+            const span = this.elements.fadeToggle.querySelector('span');
+            if (span) span.textContent = CONFIG.ENABLE_FADE ? 'Enabled' : 'Disabled';
+        });
+
+        // FPS toggle
+        this.elements.fpsToggle?.addEventListener('click', () => {
+            CONFIG.SHOW_FPS = !CONFIG.SHOW_FPS;
+            this.elements.fpsToggle.classList.toggle('active');
+            const span = this.elements.fpsToggle.querySelector('span');
+            if (span) span.textContent = CONFIG.SHOW_FPS ? 'Enabled' : 'Disabled';
+
+            // Show/hide FPS counter
+            if (this.elements.fpsCounter) {
+                this.elements.fpsCounter.style.display = CONFIG.SHOW_FPS ? 'block' : 'none';
+            }
+
+            // Reset FPS tracking
+            if (CONFIG.SHOW_FPS) {
+                STATE.frameCount = 0;
+                STATE.lastFpsTime = performance.now();
+            }
         });
     }
 

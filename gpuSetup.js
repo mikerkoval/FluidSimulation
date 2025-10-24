@@ -76,6 +76,11 @@ export function createBuffers(device, GRID_SIZE) {
         size: uniformColorSize,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+    buffers.bloomParamsBuffer = device.createBuffer({
+        label: "bloom params buffer",
+        size: 2 * 4 + 2 * 4,  // threshold + intensity + padding
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     // Initialize all state arrays to zero
     const stateArray = new Float32Array(4 * GRID_SIZE * GRID_SIZE);
     // stateArray is already filled with zeros by default
@@ -140,6 +145,27 @@ export function createTexture(device, N) {
                GPUTextureUsage.STORAGE_BINDING |
                GPUTextureUsage.TEXTURE_BINDING,
     });
-    return { texture, sampler };
+
+    // Create bloom textures for glow effect
+    const bloomTexture1 = device.createTexture({
+        size: { width: canvas.width, height: canvas.height },
+        format: 'rgba16float',
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    const bloomTexture2 = device.createTexture({
+        size: { width: canvas.width, height: canvas.height },
+        format: 'rgba16float',
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    // Create render texture for compositing
+    const renderTexture = device.createTexture({
+        size: { width: canvas.width, height: canvas.height },
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    return { texture, sampler, bloomTexture1, bloomTexture2, renderTexture };
 }
 

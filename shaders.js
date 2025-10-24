@@ -534,6 +534,133 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 velocity[IX(i, j)].x += dy * curlC * strength * uniforms.dt;
                 velocity[IX(i, j)].y += -dx * curlC * strength * uniforms.dt;
             }
+        `,
+
+        // Bloom extraction - extract bright pixels above threshold
+        bloomExtract: `
+            @group(0) @binding(0) var inputTexture: texture_2d<f32>;
+            @group(0) @binding(1) var outputTexture: texture_storage_2d<rgba16float, write>;
+
+            struct BloomParams {
+                threshold: f32,
+                intensity: f32,
+            };
+            @group(0) @binding(2) var<uniform> params: BloomParams;
+
+            @compute @workgroup_size(8, 8)
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                let texSize = textureDimensions(inputTexture);
+                if (global_id.x >= texSize.x || global_id.y >= texSize.y) {
+                    return;
+                }
+
+                let color = textureLoad(inputTexture, vec2<i32>(global_id.xy), 0);
+                let brightness = dot(color.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+
+                // Extract bright pixels above threshold
+                var bright = vec4<f32>(0.0);
+                if (brightness > params.threshold) {
+                    bright = color * ((brightness - params.threshold) / (1.0 - params.threshold));
+                }
+
+                textureStore(outputTexture, vec2<i32>(global_id.xy), bright);
+            }
+        `,
+
+        // Bloom blur horizontal pass
+        bloomBlurH: `
+            @group(0) @binding(0) var inputTexture: texture_2d<f32>;
+            @group(0) @binding(1) var outputTexture: texture_storage_2d<rgba16float, write>;
+
+            @compute @workgroup_size(8, 8)
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                let texSize = textureDimensions(inputTexture);
+                if (global_id.x >= texSize.x || global_id.y >= texSize.y) {
+                    return;
+                }
+
+                // 9-tap Gaussian blur
+                let offsets = array<i32, 5>(-2, -1, 0, 1, 2);
+                let weights = array<f32, 5>(0.06, 0.24, 0.40, 0.24, 0.06);
+
+                var result = vec4<f32>(0.0);
+                for (var i = 0; i < 5; i++) {
+                    let offset = vec2<i32>(offsets[i], 0);
+                    let samplePos = vec2<i32>(global_id.xy) + offset;
+                    let clampedPos = clamp(samplePos, vec2<i32>(0), vec2<i32>(texSize) - vec2<i32>(1));
+                    result += textureLoad(inputTexture, clampedPos, 0) * weights[i];
+                }
+
+                textureStore(outputTexture, vec2<i32>(global_id.xy), result);
+            }
+        `,
+
+        // Bloom blur vertical pass
+        bloomBlurV: `
+            @group(0) @binding(0) var inputTexture: texture_2d<f32>;
+            @group(0) @binding(1) var outputTexture: texture_storage_2d<rgba16float, write>;
+
+            @compute @workgroup_size(8, 8)
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                let texSize = textureDimensions(inputTexture);
+                if (global_id.x >= texSize.x || global_id.y >= texSize.y) {
+                    return;
+                }
+
+                // 9-tap Gaussian blur
+                let offsets = array<i32, 5>(-2, -1, 0, 1, 2);
+                let weights = array<f32, 5>(0.06, 0.24, 0.40, 0.24, 0.06);
+
+                var result = vec4<f32>(0.0);
+                for (var i = 0; i < 5; i++) {
+                    let offset = vec2<i32>(0, offsets[i]);
+                    let samplePos = vec2<i32>(global_id.xy) + offset;
+                    let clampedPos = clamp(samplePos, vec2<i32>(0), vec2<i32>(texSize) - vec2<i32>(1));
+                    result += textureLoad(inputTexture, clampedPos, 0) * weights[i];
+                }
+
+                textureStore(outputTexture, vec2<i32>(global_id.xy), result);
+            }
+        `,
+
+        // Bloom composite - add bloom to original
+        bloomComposite: `
+            struct VertexInput {
+                @location(0) position: vec2f,
+                @location(1) uv: vec2f,
+            };
+
+            struct VertexOutput {
+                @builtin(position) position: vec4f,
+                @location(0) uv: vec2f,
+            };
+
+            @group(0) @binding(0) var originalTexture: texture_2d<f32>;
+            @group(0) @binding(1) var bloomTexture: texture_2d<f32>;
+            @group(0) @binding(2) var texSampler: sampler;
+
+            struct BloomParams {
+                threshold: f32,
+                intensity: f32,
+            };
+            @group(0) @binding(3) var<uniform> params: BloomParams;
+
+            @vertex
+            fn vertexMain(input: VertexInput) -> VertexOutput {
+                var output: VertexOutput;
+                output.position = vec4f(input.position, 0, 1);
+                output.uv = input.uv;
+                return output;
+            }
+
+            @fragment
+            fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+                let original = textureSample(originalTexture, texSampler, input.uv);
+                let bloom = textureSample(bloomTexture, texSampler, input.uv);
+
+                // Additive blend with intensity
+                return original + bloom * params.intensity;
+            }
         `
     };
 }

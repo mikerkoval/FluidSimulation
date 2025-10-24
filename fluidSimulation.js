@@ -298,11 +298,78 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
         })
     };
 
+    // Bloom Extract Pipeline
+    const bloomExtractModule = device.createShaderModule({ label: "bloom extract shader", code: shaders.bloomExtract });
+    const bloomExtractLayout = device.createBindGroupLayout({
+        label: "Bloom Extract Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: "float" } },
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, storageTexture: { format: "rgba16float" } },
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: {} }
+        ]
+    });
+    pipelines.bloomExtract = {
+        layout: bloomExtractLayout,
+        program: device.createComputePipeline({
+            label: "bloom extract pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [bloomExtractLayout] }),
+            compute: { module: bloomExtractModule, entryPoint: "computeMain" }
+        })
+    };
+
+    // Bloom Blur Pipelines
+    const bloomBlurHModule = device.createShaderModule({ label: "bloom blur H shader", code: shaders.bloomBlurH });
+    const bloomBlurVModule = device.createShaderModule({ label: "bloom blur V shader", code: shaders.bloomBlurV });
+    const bloomBlurLayout = device.createBindGroupLayout({
+        label: "Bloom Blur Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: "float" } },
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, storageTexture: { format: "rgba16float" } }
+        ]
+    });
+    pipelines.bloomBlurH = {
+        layout: bloomBlurLayout,
+        program: device.createComputePipeline({
+            label: "bloom blur H pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [bloomBlurLayout] }),
+            compute: { module: bloomBlurHModule, entryPoint: "computeMain" }
+        })
+    };
+    pipelines.bloomBlurV = {
+        layout: bloomBlurLayout,
+        program: device.createComputePipeline({
+            label: "bloom blur V pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [bloomBlurLayout] }),
+            compute: { module: bloomBlurVModule, entryPoint: "computeMain" }
+        })
+    };
+
+    // Bloom Composite Pipeline
+    const bloomCompositeModule = device.createShaderModule({ label: "bloom composite shader", code: shaders.bloomComposite });
+    const bloomCompositeLayout = device.createBindGroupLayout({
+        label: "Bloom Composite Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+            { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+            { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+            { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: {} }
+        ]
+    });
+    pipelines.bloomComposite = {
+        layout: bloomCompositeLayout,
+        program: device.createRenderPipeline({
+            label: "bloom composite pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [bloomCompositeLayout] }),
+            vertex: { module: bloomCompositeModule, entryPoint: "vertexMain", buffers: [vertexBufferLayout] },
+            fragment: { module: bloomCompositeModule, entryPoint: "fragmentMain", targets: [{ format: canvasFormat }] }
+        })
+    };
+
     return pipelines;
 }
 
 export class FluidSimulation {
-    constructor(device, context, buffers, pipelines, vertexBuffer, texture, sampler) {
+    constructor(device, context, buffers, pipelines, vertexBuffer, texture, sampler, bloomTexture1, bloomTexture2, renderTexture) {
         this.device = device;
         this.context = context;
         this.buffers = buffers;
@@ -310,6 +377,9 @@ export class FluidSimulation {
         this.vertexBuffer = vertexBuffer;
         this.texture = texture;
         this.sampler = sampler;
+        this.bloomTexture1 = bloomTexture1;
+        this.bloomTexture2 = bloomTexture2;
+        this.renderTexture = renderTexture;
 
 	    const canvas = document.querySelector("canvas");
 	    this.width = canvas.width;
@@ -580,7 +650,7 @@ export class FluidSimulation {
     }
 
     applyVorticityConfinement(velocityBuffer) {
-        if (CONFIG.VORTICITY === 0) return;
+        if (!CONFIG.ENABLE_VORTICITY || CONFIG.VORTICITY === 0) return;
 
         const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
 
@@ -664,7 +734,7 @@ export class FluidSimulation {
         }
 
         // Apply fade effect
-        if (CONFIG.FADE < 1.0) {
+        if (CONFIG.ENABLE_FADE && CONFIG.FADE < 1.0) {
             this.fade(densityBuffers[STATE.densityStep % 2]);
         }
 
@@ -786,6 +856,107 @@ export class FluidSimulation {
         STATE.step = 0;
     }
 
+    applyBloom() {
+        if (!CONFIG.ENABLE_BLOOM || CONFIG.BLOOM_INTENSITY === 0) {
+            // No bloom, just draw the texture directly
+            this.drawTexture();
+            return;
+        }
+
+        // Update bloom parameters uniform
+        const bloomParams = new Float32Array([
+            CONFIG.BLOOM_THRESHOLD,
+            CONFIG.BLOOM_INTENSITY,
+            0, 0  // padding
+        ]);
+        this.device.queue.writeBuffer(this.buffers.bloomParamsBuffer, 0, bloomParams);
+
+        const encoder = this.device.createCommandEncoder();
+        const workgroupCountX = Math.ceil(this.width / 8);
+        const workgroupCountY = Math.ceil(this.height / 8);
+
+        // Step 1: Extract bright pixels
+        const extractBindGroup = this.device.createBindGroup({
+            label: "Bloom extract bind group",
+            layout: this.pipelines.bloomExtract.layout,
+            entries: [
+                { binding: 0, resource: this.texture.createView() },
+                { binding: 1, resource: this.bloomTexture1.createView() },
+                { binding: 2, resource: { buffer: this.buffers.bloomParamsBuffer } }
+            ]
+        });
+
+        let computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.bloomExtract.program);
+        computePass.setBindGroup(0, extractBindGroup);
+        computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+        computePass.end();
+
+        // Step 2: Blur horizontally (bloomTexture1 -> bloomTexture2)
+        const blurHBindGroup = this.device.createBindGroup({
+            label: "Bloom blur H bind group",
+            layout: this.pipelines.bloomBlurH.layout,
+            entries: [
+                { binding: 0, resource: this.bloomTexture1.createView() },
+                { binding: 1, resource: this.bloomTexture2.createView() }
+            ]
+        });
+
+        computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.bloomBlurH.program);
+        computePass.setBindGroup(0, blurHBindGroup);
+        computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+        computePass.end();
+
+        // Step 3: Blur vertically (bloomTexture2 -> bloomTexture1)
+        const blurVBindGroup = this.device.createBindGroup({
+            label: "Bloom blur V bind group",
+            layout: this.pipelines.bloomBlurV.layout,
+            entries: [
+                { binding: 0, resource: this.bloomTexture2.createView() },
+                { binding: 1, resource: this.bloomTexture1.createView() }
+            ]
+        });
+
+        computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.bloomBlurV.program);
+        computePass.setBindGroup(0, blurVBindGroup);
+        computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+        computePass.end();
+
+        this.device.queue.submit([encoder.finish()]);
+
+        // Step 4: Composite bloom with original
+        const compositeBindGroup = this.device.createBindGroup({
+            label: "Bloom composite bind group",
+            layout: this.pipelines.bloomComposite.layout,
+            entries: [
+                { binding: 0, resource: this.texture.createView() },
+                { binding: 1, resource: this.bloomTexture1.createView() },
+                { binding: 2, resource: this.sampler },
+                { binding: 3, resource: { buffer: this.buffers.bloomParamsBuffer } }
+            ]
+        });
+
+        const compositeEncoder = this.device.createCommandEncoder();
+        const pass = compositeEncoder.beginRenderPass({
+            colorAttachments: [{
+                view: this.context.getCurrentTexture().createView(),
+                clearValue: { r: 0, g: 0, b: 0, a: 1 },
+                loadOp: "clear",
+                storeOp: "store",
+            }]
+        });
+
+        pass.setPipeline(this.pipelines.bloomComposite.program);
+        pass.setVertexBuffer(0, this.vertexBuffer);
+        pass.setBindGroup(0, compositeBindGroup);
+        pass.draw(6, 1);
+        pass.end();
+
+        this.device.queue.submit([compositeEncoder.finish()]);
+    }
+
     run() {
         this.setUniforms(0);
 
@@ -798,11 +969,31 @@ export class FluidSimulation {
 
         if (STATE.textureDraw) {
             this.createTextureFromBuffer(buffer);
-            this.drawTexture();
+            this.applyBloom();
         } else {
             this.drawBuffer(buffer);
         }
 
         STATE.step++;
+
+        // Update FPS counter
+        if (CONFIG.SHOW_FPS) {
+            STATE.frameCount++;
+            const currentTime = performance.now();
+            const elapsed = currentTime - STATE.lastFpsTime;
+
+            // Update FPS display every 500ms
+            if (elapsed >= 500) {
+                STATE.currentFps = Math.round((STATE.frameCount * 1000) / elapsed);
+                STATE.frameCount = 0;
+                STATE.lastFpsTime = currentTime;
+
+                // Update FPS display element
+                const fpsCounter = document.getElementById('fpsCounter');
+                if (fpsCounter) {
+                    fpsCounter.textContent = `FPS: ${STATE.currentFps}`;
+                }
+            }
+        }
     }
 }
