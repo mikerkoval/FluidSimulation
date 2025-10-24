@@ -241,14 +241,16 @@ export class FluidSimulation {
         this.sampler = sampler;
 
 	    const canvas = document.querySelector("canvas");
-	    this.width = canvas.clientWidth;
-	    this.height = canvas.clientHeight;
+	    this.width = canvas.width;
+	    this.height = canvas.height;
 	    console.log('Simulation canvas size:', this.width, 'x', this.height);
     }
 
     setUniforms(b) {
-        const mouseX = STATE.mousePosition.x / this.width * CONFIG.GRID_SIZE;
-        const mouseY = (1.0 - STATE.mousePosition.y / this.height) * CONFIG.GRID_SIZE;
+        // Mouse position is in canvas pixels, convert to grid coordinates
+        // Grid coordinates go from 1 to N+1 (with 0 and N+1 being boundaries)
+        const mouseX = (STATE.mousePosition.x / this.width) * CONFIG.N + 1;
+        const mouseY = ((this.height - STATE.mousePosition.y) / this.height) * CONFIG.N + 1;
         const dt = CONFIG.UPDATE_INTERVAL / 1000;
 
         const uniformArray = new Float32Array([
@@ -306,6 +308,10 @@ export class FluidSimulation {
     }
 
     diffuse(b, outputBuffer, inputBuffer, diffusion) {
+        // Use fewer iterations for larger grids to maintain performance
+        // Use sqrt scaling to be less aggressive
+        const iterations = Math.max(2, Math.floor(CONFIG.SOLVER_ITERATIONS * Math.sqrt(64 / CONFIG.N)));
+
         const bindGroup = this.device.createBindGroup({
             label: "Diffuse bind group",
             layout: this.pipelines.diffuse.layout,
@@ -317,12 +323,12 @@ export class FluidSimulation {
         });
 
         const encoder = this.device.createCommandEncoder();
+        const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
 
-        for (let i = 0; i < CONFIG.SOLVER_ITERATIONS; i++) {
+        for (let i = 0; i < iterations; i++) {
             const computePass = encoder.beginComputePass();
             computePass.setPipeline(this.pipelines.diffuse.program);
             computePass.setBindGroup(0, bindGroup);
-            const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
             computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
             computePass.end();
 
@@ -357,7 +363,13 @@ export class FluidSimulation {
     }
 
     project(velocityBuffer, pressureBuffer) {
+        // Use fewer iterations for larger grids to maintain performance
+        // Use sqrt scaling to be less aggressive
+        const iterations = Math.max(2, Math.floor(CONFIG.SOLVER_ITERATIONS * Math.sqrt(64 / CONFIG.N)));
         const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
+
+        // Batch all operations into a single encoder for better performance
+        const encoder = this.device.createCommandEncoder();
 
         // Step 1: Calculate divergence
         const bindGroup1 = this.device.createBindGroup({
@@ -370,14 +382,12 @@ export class FluidSimulation {
             ]
         });
 
-        let encoder = this.device.createCommandEncoder();
         let computePass = encoder.beginComputePass();
         computePass.setPipeline(this.pipelines.project1.program);
         computePass.setBindGroup(0, bindGroup1);
         computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
         computePass.end();
         this.setBoundary(encoder, 0, pressureBuffer);
-        this.device.queue.submit([encoder.finish()]);
 
         // Step 2: Solve for pressure
         const bindGroup2 = this.device.createBindGroup({
@@ -390,8 +400,7 @@ export class FluidSimulation {
             ]
         });
 
-        encoder = this.device.createCommandEncoder();
-        for (let i = 0; i < CONFIG.SOLVER_ITERATIONS; i++) {
+        for (let i = 0; i < iterations; i++) {
             computePass = encoder.beginComputePass();
             computePass.setPipeline(this.pipelines.project2.program);
             computePass.setBindGroup(0, bindGroup2);
@@ -399,7 +408,6 @@ export class FluidSimulation {
             computePass.end();
             this.setBoundary(encoder, 0, pressureBuffer);
         }
-        this.device.queue.submit([encoder.finish()]);
 
         // Step 3: Subtract pressure gradient
         const bindGroup3 = this.device.createBindGroup({
@@ -412,13 +420,14 @@ export class FluidSimulation {
             ]
         });
 
-        encoder = this.device.createCommandEncoder();
         computePass = encoder.beginComputePass();
         computePass.setPipeline(this.pipelines.project3.program);
         computePass.setBindGroup(0, bindGroup3);
         computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
         computePass.end();
         this.setBoundary(encoder, 1, velocityBuffer);
+
+        // Submit all operations at once
         this.device.queue.submit([encoder.finish()]);
     }
 
@@ -438,15 +447,15 @@ export class FluidSimulation {
 
         this.device.queue.writeBuffer(this.buffers.addVelocityBuffer, 0, addSourceArr);
 
-        if (dx !== 0 || dy !== 0) {
-            this.addSource(
-                velocityBuffers[STATE.velocityStep % 2],
-                velocityBuffers[(STATE.velocityStep + 1) % 2],
-                this.buffers.addVelocityBuffer
-            );
-            STATE.velocityStep = (STATE.velocityStep + 1) % 2;
-        }
+        // Always add source (even if dx=0 and dy=0)
+        this.addSource(
+            velocityBuffers[STATE.velocityStep % 2],
+            velocityBuffers[(STATE.velocityStep + 1) % 2],
+            this.buffers.addVelocityBuffer
+        );
+        STATE.velocityStep = (STATE.velocityStep + 1) % 2;
 
+        // Always diffuse - the solver will be fast when viscosity is 0
         this.diffuse(1, velocityBuffers[STATE.velocityStep % 2],
                      velocityBuffers[(STATE.velocityStep + 1) % 2], CONFIG.VISCOSITY);
         STATE.velocityStep = (STATE.velocityStep + 1) % 2;
@@ -473,9 +482,10 @@ export class FluidSimulation {
         const dx = STATE.mousePosition.x - STATE.mousePosition.x0;
         const dy = -1 * (STATE.mousePosition.y - STATE.mousePosition.y0);
 
-        const r = 0.6 + 0.4 * Math.sin(STATE.step / 20);
-        const g = 0.6 + 0.4 * Math.cos(STATE.step / 25);
-        const b = 0.6 + 0.4 * Math.sin(STATE.step / 50);
+        // Generate vibrant, saturated colors with full range
+        const r = 0.5 + 0.5 * Math.sin(STATE.step / 20);
+        const g = 0.5 + 0.5 * Math.cos(STATE.step / 25);
+        const b = 0.5 + 0.5 * Math.sin(STATE.step / 30);
 
         const addSourceArr = new Float32Array([
             r, g, b, 1,
@@ -492,6 +502,7 @@ export class FluidSimulation {
             STATE.densityStep = (STATE.densityStep + 1) % 2;
         }
 
+        // Always diffuse - the solver will be fast when diffusion is 0
         this.diffuse(0, densityBuffers[STATE.densityStep % 2],
                      densityBuffers[(STATE.densityStep + 1) % 2], CONFIG.DIFFUSE);
         STATE.densityStep = (STATE.densityStep + 1) % 2;
@@ -517,12 +528,9 @@ export class FluidSimulation {
     computePass.setPipeline(this.pipelines.createTexture.program);
     computePass.setBindGroup(0, bindGroup);
 
-    // Dispatch to fill the entire canvas-sized texture
     const canvas = document.querySelector("canvas");
     const workgroupCountX = Math.ceil(canvas.width / CONFIG.WORKGROUP_SIZE);
     const workgroupCountY = Math.ceil(canvas.height / CONFIG.WORKGROUP_SIZE);
-
-    console.log('Dispatching workgroups:', workgroupCountX, 'x', workgroupCountY);
 
     computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
     computePass.end();
@@ -544,7 +552,7 @@ export class FluidSimulation {
         const pass = encoder.beginRenderPass({
             colorAttachments: [{
                 view: this.context.getCurrentTexture().createView(),
-                clearValue: { r: 0.3, g: 0, b: 0.4, a: 1 },
+                clearValue: { r: 0, g: 0, b: 0, a: 1 },
                 loadOp: "clear",
                 storeOp: "store",
             }]
@@ -573,7 +581,7 @@ export class FluidSimulation {
         const pass = encoder.beginRenderPass({
             colorAttachments: [{
                 view: this.context.getCurrentTexture().createView(),
-                clearValue: { r: 0.3, g: 0, b: 0.4, a: 1 },
+                clearValue: { r: 0, g: 0, b: 0, a: 1 },
                 loadOp: "clear",
                 storeOp: "store",
             }]
@@ -595,6 +603,21 @@ export class FluidSimulation {
         if (STATE.drawState === CONFIG.DRAW_VELOCITY) {
             return this.buffers.velocityBuffers[STATE.velocityStep % 2];
         }
+    }
+
+    clear() {
+        // Reset all buffers to zero
+        const stateArray = new Float32Array(4 * CONFIG.GRID_SIZE * CONFIG.GRID_SIZE);
+
+        this.device.queue.writeBuffer(this.buffers.densityBuffers[0], 0, stateArray);
+        this.device.queue.writeBuffer(this.buffers.densityBuffers[1], 0, stateArray);
+        this.device.queue.writeBuffer(this.buffers.velocityBuffers[0], 0, stateArray);
+        this.device.queue.writeBuffer(this.buffers.velocityBuffers[1], 0, stateArray);
+
+        // Reset step counters
+        STATE.densityStep = 0;
+        STATE.velocityStep = 0;
+        STATE.step = 0;
     }
 
     run() {

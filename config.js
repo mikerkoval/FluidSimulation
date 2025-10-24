@@ -9,8 +9,22 @@ export const CONFIG = {
     UPDATE_INTERVAL: 30,
     DRAW_DENSITY: 1,
     DRAW_VELOCITY: 2,
-    SOLVER_ITERATIONS: 5,      // Add this
-    DISPLAY_RESOLUTION: 512     // Add this
+    SOLVER_ITERATIONS: 5,
+    DISPLAY_RESOLUTION: 512,
+    // Auto-adjust update interval based on grid size for performance
+    getAdaptiveUpdateInterval() {
+        if (this.N <= 64) return this.UPDATE_INTERVAL;
+        if (this.N <= 128) return Math.max(this.UPDATE_INTERVAL, 40);
+        if (this.N <= 256) return Math.max(this.UPDATE_INTERVAL, 60);
+        return Math.max(this.UPDATE_INTERVAL, 80);
+    },
+    // Auto-adjust display resolution based on grid size
+    getAdaptiveDisplayResolution() {
+        if (this.N <= 64) return this.DISPLAY_RESOLUTION;
+        if (this.N <= 128) return Math.min(this.DISPLAY_RESOLUTION, 512);
+        if (this.N <= 256) return Math.min(this.DISPLAY_RESOLUTION, 256);
+        return Math.min(this.DISPLAY_RESOLUTION, 256);
+    }
 };
 
 export const STATE = {

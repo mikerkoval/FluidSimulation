@@ -63,7 +63,7 @@ export class UIController {
             clearBtn: document.getElementById('clearBtn'),
             reloadBtn: document.getElementById('reloadBtn'),
             minimizeBtn: document.getElementById('minimizeBtn'),
-            controlsPanel: document.getElementById('controlsPanel')
+            controlsPanel: document.getElementById('controlsPanel'),
             solverIterationsSlider: document.getElementById('solverIterationsSlider'),
             solverIterationsValue: document.getElementById('solverIterationsValue'),
             displayResolutionSlider: document.getElementById('displayResolutionSlider'),
@@ -78,7 +78,7 @@ export class UIController {
         if (this.elements.velocityRadiusSlider) this.elements.velocityRadiusSlider.value = CONFIG.VELOCITY_RADIUS;
         if (this.elements.updateIntervalSlider) this.elements.updateIntervalSlider.value = CONFIG.UPDATE_INTERVAL;
         if (this.elements.solverIterationsSlider) this.elements.solverIterationsSlider.value = CONFIG.SOLVER_ITERATIONS;
-if (this.elements.displayResolutionSlider) this.elements.displayResolutionSlider.value = CONFIG.DISPLAY_RESOLUTION;
+        if (this.elements.displayResolutionSlider) this.elements.displayResolutionSlider.value = CONFIG.DISPLAY_RESOLUTION;
 
         // Update all displays
         this.updateAllDisplays();

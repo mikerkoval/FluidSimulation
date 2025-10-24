@@ -114,7 +114,8 @@ export function createShaderCode(WORKGROUP_SIZE) {
             fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
                 var id = vec2u((floor(input.uv * uniforms.N)));
                 var index = IX(id.x + 1, id.y + 1);
-                return buffer[index];
+                var value = buffer[index];
+                return value;
             }
         `,
 
@@ -264,7 +265,8 @@ export function createShaderCode(WORKGROUP_SIZE) {
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
                 var dt = uniforms.dt;
                 var diff = uniforms.diffuse;
-                var a = dt * diff * (uniforms.grid_size.x -2) * (uniforms.grid_size.x - 2);
+                // Scale down the diffusion coefficient for better control
+                var a = dt * diff * uniforms.N * 0.1;
                 var index = cellIndex(global_id.xy, uniforms.grid_size.xy);
                 var color = getColorPrev(vec2i(global_id.xy));
                 color += a * (getColorNew(vec2i(global_id.xy) + vec2i( 0, 1)) +

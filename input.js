@@ -22,7 +22,21 @@ export function setupInputHandlers(canvas) {
 
     function getMousePos(canvas, e) {
         const rect = canvas.getBoundingClientRect();
-        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        // Get mouse position in CSS pixels relative to canvas
+        const cssX = e.clientX - rect.left;
+        const cssY = e.clientY - rect.top;
+
+        // Convert from CSS pixels to canvas pixels
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        const canvasX = cssX * scaleX;
+        const canvasY = cssY * scaleY;
+
+        return {
+            x: canvasX,
+            y: canvasY
+        };
     }
 
     function mouseStopped() {

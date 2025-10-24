@@ -76,7 +76,10 @@ export function createBuffers(device, GRID_SIZE) {
         size: uniformColorSize,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+    // Initialize all state arrays to zero
     const stateArray = new Float32Array(4 * GRID_SIZE * GRID_SIZE);
+    // stateArray is already filled with zeros by default
+
     buffers.densityBuffers = [
         device.createBuffer({
             label: "Density State A",
@@ -101,6 +104,13 @@ export function createBuffers(device, GRID_SIZE) {
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         })
     ];
+
+    // Initialize all buffers to zero
+    device.queue.writeBuffer(buffers.densityBuffers[0], 0, stateArray);
+    device.queue.writeBuffer(buffers.densityBuffers[1], 0, stateArray);
+    device.queue.writeBuffer(buffers.velocityBuffers[0], 0, stateArray);
+    device.queue.writeBuffer(buffers.velocityBuffers[1], 0, stateArray);
+
     return buffers;
 }
 export function createTexture(device, N) {

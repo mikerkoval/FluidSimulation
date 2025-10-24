@@ -29,12 +29,12 @@ async function main() {
         const canvas = document.querySelector("canvas");
 
         function resizeCanvas() {
-            // Setup canvas to high resolution square
+            // Setup canvas with adaptive resolution based on grid size
             const canvas = document.querySelector("canvas");
-            canvas.width = CONFIG.DISPLAY_RESOLUTION;
-            canvas.height = CONFIG.DISPLAY_RESOLUTION;
-            console.log('Canvas set to:', canvas.width, 'x', canvas.height);
-            console.log('Canvas set to:', canvas.width, 'x', canvas.height);
+            const resolution = CONFIG.getAdaptiveDisplayResolution();
+            canvas.width = resolution;
+            canvas.height = resolution;
+            console.log('Canvas set to:', canvas.width, 'x', canvas.height, 'for grid size', CONFIG.N);
         }
 
         resizeCanvas();
@@ -82,14 +82,14 @@ async function main() {
         const clearBtn = document.getElementById('clearBtn');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
-                if (simulation.clear) {
-                    simulation.clear();
-                }
+                simulation.clear();
             });
         }
 
-        // Start simulation loop
-        setInterval(() => simulation.run(), CONFIG.UPDATE_INTERVAL);
+        // Start simulation loop with adaptive interval for performance
+        const updateInterval = CONFIG.getAdaptiveUpdateInterval();
+        console.log('Update interval:', updateInterval, 'ms for grid size', CONFIG.N);
+        setInterval(() => simulation.run(), updateInterval);
 
         console.log('Fluid simulation started successfully!');
         console.log('UI controls initialized');
