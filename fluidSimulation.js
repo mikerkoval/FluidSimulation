@@ -385,6 +385,463 @@ export class FluidSimulation {
 	    this.width = canvas.width;
 	    this.height = canvas.height;
 	    console.log('Simulation canvas size:', this.width, 'x', this.height);
+
+        // Create all bind groups upfront to avoid recreating them every frame
+        this.createBindGroups();
+    }
+
+    createBindGroups() {
+        // Cache for bind groups that don't change
+        this.bindGroups = {};
+
+        // Add source bind groups (need 4 combinations for density/velocity buffers)
+        this.bindGroups.addDensity = [
+            this.device.createBindGroup({
+                label: "Add density 0 bind group",
+                layout: this.pipelines.addDensity.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } },
+                    { binding: 3, resource: { buffer: this.buffers.addDensityBuffer } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Add density 1 bind group",
+                layout: this.pipelines.addDensity.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } },
+                    { binding: 3, resource: { buffer: this.buffers.addDensityBuffer } }
+                ]
+            })
+        ];
+
+        this.bindGroups.addVelocity = [
+            this.device.createBindGroup({
+                label: "Add velocity 0 bind group",
+                layout: this.pipelines.addDensity.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 3, resource: { buffer: this.buffers.addVelocityBuffer } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Add velocity 1 bind group",
+                layout: this.pipelines.addDensity.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 3, resource: { buffer: this.buffers.addVelocityBuffer } }
+                ]
+            })
+        ];
+
+        // Boundary bind groups
+        this.bindGroups.boundary = [
+            this.device.createBindGroup({
+                label: "Boundary density 0",
+                layout: this.pipelines.boundary.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Boundary density 1",
+                layout: this.pipelines.boundary.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Boundary velocity 0",
+                layout: this.pipelines.boundary.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Boundary velocity 1",
+                layout: this.pipelines.boundary.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                ]
+            })
+        ];
+
+        // Diffuse bind groups (density and velocity)
+        this.bindGroups.diffuseDensity = [
+            this.device.createBindGroup({
+                label: "Diffuse density 0",
+                layout: this.pipelines.diffuse.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Diffuse density 1",
+                layout: this.pipelines.diffuse.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } }
+                ]
+            })
+        ];
+
+        this.bindGroups.diffuseVelocity = [
+            this.device.createBindGroup({
+                label: "Diffuse velocity 0",
+                layout: this.pipelines.diffuse.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Diffuse velocity 1",
+                layout: this.pipelines.diffuse.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                ]
+            })
+        ];
+
+        // Advect bind groups
+        this.bindGroups.advectDensity = [
+            this.device.createBindGroup({
+                label: "Advect density 0→0",
+                layout: this.pipelines.advect.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } },
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Advect density 1→0",
+                layout: this.pipelines.advect.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } },
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Advect density 0→1",
+                layout: this.pipelines.advect.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } },
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Advect density 1→1",
+                layout: this.pipelines.advect.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } },
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                ]
+            })
+        ];
+
+        this.bindGroups.advectVelocity = [
+            this.device.createBindGroup({
+                label: "Advect velocity 0",
+                layout: this.pipelines.advect.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Advect velocity 1",
+                layout: this.pipelines.advect.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                ]
+            })
+        ];
+
+        // Project bind groups
+        this.bindGroups.project1 = [
+            this.device.createBindGroup({
+                label: "Project1 0",
+                layout: this.pipelines.project1.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Project1 1",
+                layout: this.pipelines.project1.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                ]
+            })
+        ];
+
+        this.bindGroups.project2 = [
+            this.device.createBindGroup({
+                label: "Project2 0",
+                layout: this.pipelines.project2.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Project2 1",
+                layout: this.pipelines.project2.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                ]
+            })
+        ];
+
+        this.bindGroups.project3 = [
+            this.device.createBindGroup({
+                label: "Project3 0",
+                layout: this.pipelines.project3.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Project3 1",
+                layout: this.pipelines.project3.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                ]
+            })
+        ];
+
+        // Fade bind groups
+        this.bindGroups.fade = [
+            this.device.createBindGroup({
+                label: "Fade density 0",
+                layout: this.pipelines.fade.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Fade density 1",
+                layout: this.pipelines.fade.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } }
+                ]
+            })
+        ];
+
+        // Vorticity bind groups
+        this.bindGroups.vorticity = [
+            this.device.createBindGroup({
+                label: "Vorticity 0",
+                layout: this.pipelines.vorticity.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.curlBuffer } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Vorticity 1",
+                layout: this.pipelines.vorticity.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.curlBuffer } }
+                ]
+            })
+        ];
+
+        this.bindGroups.vorticityConfinement = [
+            this.device.createBindGroup({
+                label: "Vorticity confinement 0",
+                layout: this.pipelines.vorticityConfinement.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.curlBuffer } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Vorticity confinement 1",
+                layout: this.pipelines.vorticityConfinement.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.curlBuffer } }
+                ]
+            })
+        ];
+
+        // Texture creation bind groups
+        this.bindGroups.createTexture = [
+            this.device.createBindGroup({
+                label: "Create texture density 0",
+                layout: this.pipelines.createTexture.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: this.texture.createView() },
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Create texture density 1",
+                layout: this.pipelines.createTexture.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: this.texture.createView() },
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Create texture velocity 0",
+                layout: this.pipelines.createTexture.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: this.texture.createView() },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Create texture velocity 1",
+                layout: this.pipelines.createTexture.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: this.texture.createView() },
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                ]
+            })
+        ];
+
+        // Draw texture bind group (static)
+        this.bindGroups.drawTexture = this.device.createBindGroup({
+            label: "Draw texture",
+            layout: this.pipelines.drawTexture.layout,
+            entries: [
+                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                { binding: 1, resource: this.texture.createView() },
+                { binding: 2, resource: this.sampler }
+            ]
+        });
+
+        // Draw buffer bind groups
+        this.bindGroups.drawBuffer = [
+            this.device.createBindGroup({
+                label: "Draw buffer density 0",
+                layout: this.pipelines.drawBuffer.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Draw buffer density 1",
+                layout: this.pipelines.drawBuffer.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Draw buffer velocity 0",
+                layout: this.pipelines.drawBuffer.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                ]
+            }),
+            this.device.createBindGroup({
+                label: "Draw buffer velocity 1",
+                layout: this.pipelines.drawBuffer.layout,
+                entries: [
+                    { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                ]
+            })
+        ];
+
+        // Bloom bind groups (static)
+        this.bindGroups.bloomExtract = this.device.createBindGroup({
+            label: "Bloom extract",
+            layout: this.pipelines.bloomExtract.layout,
+            entries: [
+                { binding: 0, resource: this.texture.createView() },
+                { binding: 1, resource: this.bloomTexture1.createView() },
+                { binding: 2, resource: { buffer: this.buffers.bloomParamsBuffer } }
+            ]
+        });
+
+        this.bindGroups.bloomBlurH = this.device.createBindGroup({
+            label: "Bloom blur H",
+            layout: this.pipelines.bloomBlurH.layout,
+            entries: [
+                { binding: 0, resource: this.bloomTexture1.createView() },
+                { binding: 1, resource: this.bloomTexture2.createView() }
+            ]
+        });
+
+        this.bindGroups.bloomBlurV = this.device.createBindGroup({
+            label: "Bloom blur V",
+            layout: this.pipelines.bloomBlurV.layout,
+            entries: [
+                { binding: 0, resource: this.bloomTexture2.createView() },
+                { binding: 1, resource: this.bloomTexture1.createView() }
+            ]
+        });
+
+        this.bindGroups.bloomComposite = this.device.createBindGroup({
+            label: "Bloom composite",
+            layout: this.pipelines.bloomComposite.layout,
+            entries: [
+                { binding: 0, resource: this.texture.createView() },
+                { binding: 1, resource: this.bloomTexture1.createView() },
+                { binding: 2, resource: this.sampler },
+                { binding: 3, resource: { buffer: this.buffers.bloomParamsBuffer } }
+            ]
+        });
+
+        console.log('Bind groups created and cached');
     }
 
     setUniforms(b) {
@@ -406,16 +863,17 @@ export class FluidSimulation {
     }
 
     addSource(outputBuffer, inputBuffer, sourceBuffer) {
-        const bindGroup = this.device.createBindGroup({
-            label: "Add source bind group",
-            layout: this.pipelines.addDensity.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: outputBuffer } },
-                { binding: 2, resource: { buffer: inputBuffer } },
-                { binding: 3, resource: { buffer: sourceBuffer } }
-            ]
-        });
+        // Determine which cached bind group to use based on buffer type
+        let bindGroup;
+        if (sourceBuffer === this.buffers.addDensityBuffer) {
+            // Density source - check which buffer is output
+            bindGroup = (outputBuffer === this.buffers.densityBuffers[0]) ?
+                this.bindGroups.addDensity[0] : this.bindGroups.addDensity[1];
+        } else {
+            // Velocity source
+            bindGroup = (outputBuffer === this.buffers.velocityBuffers[0]) ?
+                this.bindGroups.addVelocity[0] : this.bindGroups.addVelocity[1];
+        }
 
         const encoder = this.device.createCommandEncoder();
         const computePass = encoder.beginComputePass();
@@ -431,18 +889,16 @@ export class FluidSimulation {
     setBoundary(encoder, b, buffer) {
         this.setUniforms(b);
 
-        const bindGroup = this.device.createBindGroup({
-            label: "Boundary bind group",
-            layout: this.pipelines.boundary.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: buffer } }
-            ]
-        });
+        // Determine which cached bind group to use
+        let bindGroupIndex;
+        if (buffer === this.buffers.densityBuffers[0]) bindGroupIndex = 0;
+        else if (buffer === this.buffers.densityBuffers[1]) bindGroupIndex = 1;
+        else if (buffer === this.buffers.velocityBuffers[0]) bindGroupIndex = 2;
+        else bindGroupIndex = 3; // velocityBuffers[1]
 
         const computePass = encoder.beginComputePass();
         computePass.setPipeline(this.pipelines.boundary.program);
-        computePass.setBindGroup(0, bindGroup);
+        computePass.setBindGroup(0, this.bindGroups.boundary[bindGroupIndex]);
         const workgroupCount = Math.ceil(CONFIG.GRID_SIZE / CONFIG.WORKGROUP_SIZE);
         computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
         computePass.end();
@@ -453,15 +909,17 @@ export class FluidSimulation {
         // Use sqrt scaling to be less aggressive
         const iterations = Math.max(2, Math.floor(CONFIG.SOLVER_ITERATIONS * Math.sqrt(64 / CONFIG.N)));
 
-        const bindGroup = this.device.createBindGroup({
-            label: "Diffuse bind group",
-            layout: this.pipelines.diffuse.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: outputBuffer } },
-                { binding: 2, resource: { buffer: inputBuffer } }
-            ]
-        });
+        // Determine which cached bind group to use
+        let bindGroup;
+        if (outputBuffer === this.buffers.densityBuffers[0]) {
+            bindGroup = this.bindGroups.diffuseDensity[0];
+        } else if (outputBuffer === this.buffers.densityBuffers[1]) {
+            bindGroup = this.bindGroups.diffuseDensity[1];
+        } else if (outputBuffer === this.buffers.velocityBuffers[0]) {
+            bindGroup = this.bindGroups.diffuseVelocity[0];
+        } else {
+            bindGroup = this.bindGroups.diffuseVelocity[1];
+        }
 
         const encoder = this.device.createCommandEncoder();
         const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
@@ -480,16 +938,20 @@ export class FluidSimulation {
     }
 
     advect(b, outputBuffer, inputBuffer, velocityBuffer) {
-        const bindGroup = this.device.createBindGroup({
-            label: "Advect bind group",
-            layout: this.pipelines.advect.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: outputBuffer } },
-                { binding: 2, resource: { buffer: inputBuffer } },
-                { binding: 3, resource: { buffer: velocityBuffer } }
-            ]
-        });
+        // Determine which cached bind group to use
+        let bindGroup;
+
+        // Check if we're advecting density or velocity
+        if (outputBuffer === this.buffers.densityBuffers[0] || outputBuffer === this.buffers.densityBuffers[1]) {
+            // Advecting density - need to check output buffer and velocity buffer
+            const outputIdx = (outputBuffer === this.buffers.densityBuffers[0]) ? 0 : 1;
+            const velIdx = (velocityBuffer === this.buffers.velocityBuffers[0]) ? 0 : 1;
+            bindGroup = this.bindGroups.advectDensity[outputIdx * 2 + velIdx];
+        } else {
+            // Advecting velocity - simpler case, velocity uses same velocity buffer
+            bindGroup = (outputBuffer === this.buffers.velocityBuffers[0]) ?
+                this.bindGroups.advectVelocity[0] : this.bindGroups.advectVelocity[1];
+        }
 
         const encoder = this.device.createCommandEncoder();
         const computePass = encoder.beginComputePass();
@@ -509,61 +971,34 @@ export class FluidSimulation {
         const iterations = Math.max(2, Math.floor(CONFIG.SOLVER_ITERATIONS * Math.sqrt(64 / CONFIG.N)));
         const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
 
+        // Determine which cached bind groups to use
+        const bufferIndex = (velocityBuffer === this.buffers.velocityBuffers[0]) ? 0 : 1;
+
         // Batch all operations into a single encoder for better performance
         const encoder = this.device.createCommandEncoder();
 
         // Step 1: Calculate divergence
-        const bindGroup1 = this.device.createBindGroup({
-            label: "Project1 bind group",
-            layout: this.pipelines.project1.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: velocityBuffer } },
-                { binding: 2, resource: { buffer: pressureBuffer } }
-            ]
-        });
-
         let computePass = encoder.beginComputePass();
         computePass.setPipeline(this.pipelines.project1.program);
-        computePass.setBindGroup(0, bindGroup1);
+        computePass.setBindGroup(0, this.bindGroups.project1[bufferIndex]);
         computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
         computePass.end();
         this.setBoundary(encoder, 0, pressureBuffer);
 
         // Step 2: Solve for pressure
-        const bindGroup2 = this.device.createBindGroup({
-            label: "Project2 bind group",
-            layout: this.pipelines.project2.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: velocityBuffer } },
-                { binding: 2, resource: { buffer: pressureBuffer } }
-            ]
-        });
-
         for (let i = 0; i < iterations; i++) {
             computePass = encoder.beginComputePass();
             computePass.setPipeline(this.pipelines.project2.program);
-            computePass.setBindGroup(0, bindGroup2);
+            computePass.setBindGroup(0, this.bindGroups.project2[bufferIndex]);
             computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
             computePass.end();
             this.setBoundary(encoder, 0, pressureBuffer);
         }
 
         // Step 3: Subtract pressure gradient
-        const bindGroup3 = this.device.createBindGroup({
-            label: "Project3 bind group",
-            layout: this.pipelines.project3.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: velocityBuffer } },
-                { binding: 2, resource: { buffer: pressureBuffer } }
-            ]
-        });
-
         computePass = encoder.beginComputePass();
         computePass.setPipeline(this.pipelines.project3.program);
-        computePass.setBindGroup(0, bindGroup3);
+        computePass.setBindGroup(0, this.bindGroups.project3[bufferIndex]);
         computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
         computePass.end();
         this.setBoundary(encoder, 1, velocityBuffer);
@@ -628,20 +1063,13 @@ export class FluidSimulation {
         ]);
         this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, uniformArray);
 
+        // Determine which cached bind group to use
+        const bindGroupIndex = (buffer === this.buffers.densityBuffers[0]) ? 0 : 1;
+
         const encoder = this.device.createCommandEncoder();
         const computePass = encoder.beginComputePass();
         computePass.setPipeline(this.pipelines.fade.program);
-
-        const bindGroup = this.device.createBindGroup({
-            label: "Fade bind group",
-            layout: this.pipelines.fade.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: buffer } }
-            ]
-        });
-
-        computePass.setBindGroup(0, bindGroup);
+        computePass.setBindGroup(0, this.bindGroups.fade[bindGroupIndex]);
         const workgroupCount = Math.ceil(CONFIG.GRID_SIZE / CONFIG.WORKGROUP_SIZE);
         computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
         computePass.end();
@@ -664,39 +1092,22 @@ export class FluidSimulation {
         ]);
         this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, uniformArray);
 
+        // Determine which cached bind groups to use
+        const bufferIndex = (velocityBuffer === this.buffers.velocityBuffers[0]) ? 0 : 1;
+
         const encoder = this.device.createCommandEncoder();
 
         // Step 1: Calculate vorticity (curl of velocity field)
-        const vorticityBindGroup = this.device.createBindGroup({
-            label: "Vorticity bind group",
-            layout: this.pipelines.vorticity.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: velocityBuffer } },
-                { binding: 2, resource: { buffer: this.buffers.curlBuffer } }
-            ]
-        });
-
         let computePass = encoder.beginComputePass();
         computePass.setPipeline(this.pipelines.vorticity.program);
-        computePass.setBindGroup(0, vorticityBindGroup);
+        computePass.setBindGroup(0, this.bindGroups.vorticity[bufferIndex]);
         computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
         computePass.end();
 
         // Step 2: Apply vorticity confinement force
-        const confinementBindGroup = this.device.createBindGroup({
-            label: "Vorticity confinement bind group",
-            layout: this.pipelines.vorticityConfinement.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: velocityBuffer } },
-                { binding: 2, resource: { buffer: this.buffers.curlBuffer } }
-            ]
-        });
-
         computePass = encoder.beginComputePass();
         computePass.setPipeline(this.pipelines.vorticityConfinement.program);
-        computePass.setBindGroup(0, confinementBindGroup);
+        computePass.setBindGroup(0, this.bindGroups.vorticityConfinement[bufferIndex]);
         computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
         computePass.end();
 
@@ -749,41 +1160,28 @@ export class FluidSimulation {
     }
 
 	createTextureFromBuffer(buffer) {
-    const bindGroup = this.device.createBindGroup({
-        label: "Create texture bind group",
-        layout: this.pipelines.createTexture.layout,
-        entries: [
-            { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-            { binding: 1, resource: this.texture.createView() },
-            { binding: 2, resource: { buffer: buffer } }
-        ]
-    });
+        // Determine which cached bind group to use
+        let bindGroupIndex;
+        if (buffer === this.buffers.densityBuffers[0]) bindGroupIndex = 0;
+        else if (buffer === this.buffers.densityBuffers[1]) bindGroupIndex = 1;
+        else if (buffer === this.buffers.velocityBuffers[0]) bindGroupIndex = 2;
+        else bindGroupIndex = 3; // velocityBuffers[1]
 
-    const encoder = this.device.createCommandEncoder();
-    const computePass = encoder.beginComputePass();
-    computePass.setPipeline(this.pipelines.createTexture.program);
-    computePass.setBindGroup(0, bindGroup);
+        const encoder = this.device.createCommandEncoder();
+        const computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.createTexture.program);
+        computePass.setBindGroup(0, this.bindGroups.createTexture[bindGroupIndex]);
 
-    const canvas = document.querySelector("canvas");
-    const workgroupCountX = Math.ceil(canvas.width / CONFIG.WORKGROUP_SIZE);
-    const workgroupCountY = Math.ceil(canvas.height / CONFIG.WORKGROUP_SIZE);
+        const canvas = document.querySelector("canvas");
+        const workgroupCountX = Math.ceil(canvas.width / CONFIG.WORKGROUP_SIZE);
+        const workgroupCountY = Math.ceil(canvas.height / CONFIG.WORKGROUP_SIZE);
 
-    computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
-    computePass.end();
+        computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+        computePass.end();
 
-    this.device.queue.submit([encoder.finish()]);
-}
+        this.device.queue.submit([encoder.finish()]);
+    }
     drawTexture() {
-        const bindGroup = this.device.createBindGroup({
-            label: "Draw texture bind group",
-            layout: this.pipelines.drawTexture.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: this.texture.createView() },
-                { binding: 2, resource: this.sampler }
-            ]
-        });
-
         const encoder = this.device.createCommandEncoder();
         const pass = encoder.beginRenderPass({
             colorAttachments: [{
@@ -796,7 +1194,7 @@ export class FluidSimulation {
 
         pass.setPipeline(this.pipelines.drawTexture.program);
         pass.setVertexBuffer(0, this.vertexBuffer);
-        pass.setBindGroup(0, bindGroup);
+        pass.setBindGroup(0, this.bindGroups.drawTexture);
         pass.draw(6, 1);
         pass.end();
 
@@ -876,68 +1274,29 @@ export class FluidSimulation {
         const workgroupCountY = Math.ceil(this.height / 8);
 
         // Step 1: Extract bright pixels
-        const extractBindGroup = this.device.createBindGroup({
-            label: "Bloom extract bind group",
-            layout: this.pipelines.bloomExtract.layout,
-            entries: [
-                { binding: 0, resource: this.texture.createView() },
-                { binding: 1, resource: this.bloomTexture1.createView() },
-                { binding: 2, resource: { buffer: this.buffers.bloomParamsBuffer } }
-            ]
-        });
-
         let computePass = encoder.beginComputePass();
         computePass.setPipeline(this.pipelines.bloomExtract.program);
-        computePass.setBindGroup(0, extractBindGroup);
+        computePass.setBindGroup(0, this.bindGroups.bloomExtract);
         computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
         computePass.end();
 
         // Step 2: Blur horizontally (bloomTexture1 -> bloomTexture2)
-        const blurHBindGroup = this.device.createBindGroup({
-            label: "Bloom blur H bind group",
-            layout: this.pipelines.bloomBlurH.layout,
-            entries: [
-                { binding: 0, resource: this.bloomTexture1.createView() },
-                { binding: 1, resource: this.bloomTexture2.createView() }
-            ]
-        });
-
         computePass = encoder.beginComputePass();
         computePass.setPipeline(this.pipelines.bloomBlurH.program);
-        computePass.setBindGroup(0, blurHBindGroup);
+        computePass.setBindGroup(0, this.bindGroups.bloomBlurH);
         computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
         computePass.end();
 
         // Step 3: Blur vertically (bloomTexture2 -> bloomTexture1)
-        const blurVBindGroup = this.device.createBindGroup({
-            label: "Bloom blur V bind group",
-            layout: this.pipelines.bloomBlurV.layout,
-            entries: [
-                { binding: 0, resource: this.bloomTexture2.createView() },
-                { binding: 1, resource: this.bloomTexture1.createView() }
-            ]
-        });
-
         computePass = encoder.beginComputePass();
         computePass.setPipeline(this.pipelines.bloomBlurV.program);
-        computePass.setBindGroup(0, blurVBindGroup);
+        computePass.setBindGroup(0, this.bindGroups.bloomBlurV);
         computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
         computePass.end();
 
         this.device.queue.submit([encoder.finish()]);
 
         // Step 4: Composite bloom with original
-        const compositeBindGroup = this.device.createBindGroup({
-            label: "Bloom composite bind group",
-            layout: this.pipelines.bloomComposite.layout,
-            entries: [
-                { binding: 0, resource: this.texture.createView() },
-                { binding: 1, resource: this.bloomTexture1.createView() },
-                { binding: 2, resource: this.sampler },
-                { binding: 3, resource: { buffer: this.buffers.bloomParamsBuffer } }
-            ]
-        });
-
         const compositeEncoder = this.device.createCommandEncoder();
         const pass = compositeEncoder.beginRenderPass({
             colorAttachments: [{
@@ -950,7 +1309,7 @@ export class FluidSimulation {
 
         pass.setPipeline(this.pipelines.bloomComposite.program);
         pass.setVertexBuffer(0, this.vertexBuffer);
-        pass.setBindGroup(0, compositeBindGroup);
+        pass.setBindGroup(0, this.bindGroups.bloomComposite);
         pass.draw(6, 1);
         pass.end();
 
