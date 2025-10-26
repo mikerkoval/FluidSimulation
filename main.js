@@ -71,7 +71,7 @@ async function main() {
         );
 
         // Setup input handlers
-        setupInputHandlers(canvas);
+        setupInputHandlers(canvas, simulation);
 
         // Initialize UI controls
         console.log('Initializing UI controller...');
@@ -86,6 +86,14 @@ async function main() {
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
                 simulation.clear();
+            });
+        }
+
+        // Connect clear obstacles button to simulation
+        const clearObstaclesBtn = document.getElementById('clearObstaclesBtn');
+        if (clearObstaclesBtn) {
+            clearObstaclesBtn.addEventListener('click', () => {
+                simulation.clearObstacles();
             });
         }
 

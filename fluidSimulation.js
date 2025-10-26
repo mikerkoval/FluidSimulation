@@ -16,7 +16,8 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
         entries: [
             { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
             { binding: 1, visibility: GPUShaderStage.COMPUTE, storageTexture: { format: "rgba8unorm" } },
-            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} }
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} },
+            { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} }
         ]
     });
 
@@ -113,7 +114,8 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
         label: "Boundary Bind Group Layout",
         entries: [
             { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
-            { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} }
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} },
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} }
         ]
     });
 
@@ -137,7 +139,8 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
         entries: [
             { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
             { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} },
-            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} }
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} },
+            { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} }
         ]
     });
 
@@ -162,7 +165,8 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
             { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
             { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} },
             { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} },
-            { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} }
+            { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} },
+            { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} }
         ]
     });
 
@@ -365,6 +369,30 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
         })
     };
 
+    // Set Obstacle Pipeline
+    const setObstacleModule = device.createShaderModule({
+        label: "set obstacle shader",
+        code: shaders.setObstacle
+    });
+
+    const setObstacleLayout = device.createBindGroupLayout({
+        label: "Set Obstacle Bind Group Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} },
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: {} }
+        ]
+    });
+
+    pipelines.setObstacle = {
+        layout: setObstacleLayout,
+        program: device.createComputePipeline({
+            label: "set obstacle pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [setObstacleLayout] }),
+            compute: { module: setObstacleModule, entryPoint: "computeMain" }
+        })
+    };
+
     return pipelines;
 }
 
@@ -448,7 +476,8 @@ export class FluidSimulation {
                 layout: this.pipelines.boundary.layout,
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } }
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -456,7 +485,8 @@ export class FluidSimulation {
                 layout: this.pipelines.boundary.layout,
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } }
+                    { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -464,7 +494,8 @@ export class FluidSimulation {
                 layout: this.pipelines.boundary.layout,
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 2, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -472,7 +503,8 @@ export class FluidSimulation {
                 layout: this.pipelines.boundary.layout,
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                    { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 2, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             })
         ];
@@ -485,7 +517,8 @@ export class FluidSimulation {
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } },
-                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } }
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } },
+                    { binding: 3, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -494,7 +527,8 @@ export class FluidSimulation {
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } },
-                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } }
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } },
+                    { binding: 3, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             })
         ];
@@ -506,7 +540,8 @@ export class FluidSimulation {
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
-                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 3, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -515,7 +550,8 @@ export class FluidSimulation {
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
-                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 3, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             })
         ];
@@ -529,7 +565,8 @@ export class FluidSimulation {
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } },
                     { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } },
-                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 4, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -539,7 +576,8 @@ export class FluidSimulation {
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } },
                     { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } },
-                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 4, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -549,7 +587,8 @@ export class FluidSimulation {
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } },
                     { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } },
-                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 4, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -559,7 +598,8 @@ export class FluidSimulation {
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } },
                     { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } },
-                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 4, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             })
         ];
@@ -572,7 +612,8 @@ export class FluidSimulation {
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
                     { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } },
-                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 4, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -582,7 +623,8 @@ export class FluidSimulation {
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
                     { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } },
-                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                    { binding: 3, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 4, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             })
         ];
@@ -722,7 +764,8 @@ export class FluidSimulation {
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: this.texture.createView() },
-                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } }
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } },
+                    { binding: 3, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -731,7 +774,8 @@ export class FluidSimulation {
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: this.texture.createView() },
-                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } }
+                    { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } },
+                    { binding: 3, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -740,7 +784,8 @@ export class FluidSimulation {
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: this.texture.createView() },
-                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } }
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } },
+                    { binding: 3, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -749,7 +794,8 @@ export class FluidSimulation {
                 entries: [
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: this.texture.createView() },
-                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } }
+                    { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } },
+                    { binding: 3, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             })
         ];
@@ -841,6 +887,17 @@ export class FluidSimulation {
             ]
         });
 
+        // Set Obstacle bind group
+        this.bindGroups.setObstacle = this.device.createBindGroup({
+            label: "Set obstacle",
+            layout: this.pipelines.setObstacle.layout,
+            entries: [
+                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
+                { binding: 1, resource: { buffer: this.buffers.obstacleBuffer } },
+                { binding: 2, resource: { buffer: this.buffers.obstacleSourceBuffer } }
+            ]
+        });
+
         console.log('Bind groups created and cached');
     }
 
@@ -856,7 +913,7 @@ export class FluidSimulation {
             CONFIG.GRID_SIZE, CONFIG.GRID_SIZE,
             STATE.diffuseState, 0,
             CONFIG.N, dt,
-            b, 0
+            b, CONFIG.getPaletteIndex()
         ]);
 
         this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, uniformArray);
@@ -905,9 +962,8 @@ export class FluidSimulation {
     }
 
     diffuse(b, outputBuffer, inputBuffer, diffusion) {
-        // Use fewer iterations for larger grids to maintain performance
-        // Use sqrt scaling to be less aggressive
-        const iterations = Math.max(2, Math.floor(CONFIG.SOLVER_ITERATIONS * Math.sqrt(64 / CONFIG.N)));
+        // Use adaptive iteration count based on performance
+        const iterations = Math.max(2, Math.floor(STATE.currentSolverIterations * Math.sqrt(64 / CONFIG.N)));
 
         // Determine which cached bind group to use
         let bindGroup;
@@ -966,9 +1022,8 @@ export class FluidSimulation {
     }
 
     project(velocityBuffer, pressureBuffer) {
-        // Use fewer iterations for larger grids to maintain performance
-        // Use sqrt scaling to be less aggressive
-        const iterations = Math.max(2, Math.floor(CONFIG.SOLVER_ITERATIONS * Math.sqrt(64 / CONFIG.N)));
+        // Use adaptive iteration count based on performance
+        const iterations = Math.max(2, Math.floor(STATE.currentSolverIterations * Math.sqrt(64 / CONFIG.N)));
         const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
 
         // Determine which cached bind groups to use
@@ -1059,7 +1114,7 @@ export class FluidSimulation {
             CONFIG.GRID_SIZE, CONFIG.GRID_SIZE,
             CONFIG.FADE, 0,  // Use fade value in diffuse slot
             CONFIG.N, 0,  // dt not used
-            0, 0  // b not used
+            0, CONFIG.getPaletteIndex()  // b, palette
         ]);
         this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, uniformArray);
 
@@ -1088,7 +1143,7 @@ export class FluidSimulation {
             CONFIG.GRID_SIZE, CONFIG.GRID_SIZE,
             CONFIG.VORTICITY, 0,  // vorticity strength in diffuse slot
             CONFIG.N, CONFIG.UPDATE_INTERVAL / 1000,  // N and dt
-            0, 0  // b not used
+            0, CONFIG.getPaletteIndex()  // b, palette
         ]);
         this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, uniformArray);
 
@@ -1202,14 +1257,12 @@ export class FluidSimulation {
     }
 
     drawBuffer(buffer) {
-        const bindGroup = this.device.createBindGroup({
-            label: "Draw buffer bind group",
-            layout: this.pipelines.drawBuffer.layout,
-            entries: [
-                { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: buffer } }
-            ]
-        });
+        // Determine which cached bind group to use
+        let bindGroupIndex;
+        if (buffer === this.buffers.densityBuffers[0]) bindGroupIndex = 0;
+        else if (buffer === this.buffers.densityBuffers[1]) bindGroupIndex = 1;
+        else if (buffer === this.buffers.velocityBuffers[0]) bindGroupIndex = 2;
+        else bindGroupIndex = 3; // velocityBuffers[1]
 
         const encoder = this.device.createCommandEncoder();
         const pass = encoder.beginRenderPass({
@@ -1223,7 +1276,7 @@ export class FluidSimulation {
 
         pass.setPipeline(this.pipelines.drawBuffer.program);
         pass.setVertexBuffer(0, this.vertexBuffer);
-        pass.setBindGroup(0, bindGroup);
+        pass.setBindGroup(0, this.bindGroups.drawBuffer[bindGroupIndex]);
         pass.draw(6, 1);
         pass.end();
 
@@ -1316,6 +1369,37 @@ export class FluidSimulation {
         this.device.queue.submit([compositeEncoder.finish()]);
     }
 
+    setObstacle(value) {
+        // value: 1.0 to place obstacle, 0.0 to remove
+
+        // Update uniforms to get current mouse position
+        this.setUniforms(0);
+
+        const obstacleSourceArr = new Float32Array([
+            value,
+            STATE.obstacleRadius,
+            0, 0  // padding
+        ]);
+        this.device.queue.writeBuffer(this.buffers.obstacleSourceBuffer, 0, obstacleSourceArr);
+
+        const encoder = this.device.createCommandEncoder();
+        const computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.setObstacle.program);
+        computePass.setBindGroup(0, this.bindGroups.setObstacle);
+        const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
+        computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
+        computePass.end();
+
+        this.device.queue.submit([encoder.finish()]);
+    }
+
+    clearObstacles() {
+        // Reset obstacle buffer to zero (all fluid cells)
+        const stateArray = new Float32Array(4 * CONFIG.GRID_SIZE * CONFIG.GRID_SIZE);
+        this.device.queue.writeBuffer(this.buffers.obstacleBuffer, 0, stateArray);
+        console.log('All obstacles cleared');
+    }
+
     run() {
         this.setUniforms(0);
 
@@ -1350,7 +1434,37 @@ export class FluidSimulation {
                 // Update FPS display element
                 const fpsCounter = document.getElementById('fpsCounter');
                 if (fpsCounter) {
-                    fpsCounter.textContent = `FPS: ${STATE.currentFps}`;
+                    fpsCounter.textContent = `FPS: ${STATE.currentFps} (iter: ${STATE.currentSolverIterations})`;
+                }
+
+                // Adaptive performance: adjust solver iterations based on FPS
+                if (CONFIG.ENABLE_ADAPTIVE_PERFORMANCE) {
+                    const timeSinceLastAdjustment = currentTime - STATE.lastAdjustmentTime;
+
+                    // Only adjust every 2 seconds to avoid oscillation
+                    if (timeSinceLastAdjustment >= STATE.adjustmentCooldown) {
+                        // Track FPS history for smoother adjustments
+                        STATE.fpsHistory.push(STATE.currentFps);
+                        if (STATE.fpsHistory.length > CONFIG.FPS_SAMPLE_SIZE) {
+                            STATE.fpsHistory.shift();
+                        }
+
+                        // Calculate average FPS over sample period
+                        const avgFps = STATE.fpsHistory.reduce((a, b) => a + b, 0) / STATE.fpsHistory.length;
+
+                        // Adjust iterations based on FPS
+                        if (avgFps < CONFIG.TARGET_FPS - 5 && STATE.currentSolverIterations > 2) {
+                            // FPS too low, reduce quality
+                            STATE.currentSolverIterations = Math.max(2, STATE.currentSolverIterations - 1);
+                            console.log(`Adaptive: Reducing iterations to ${STATE.currentSolverIterations} (FPS: ${avgFps.toFixed(1)})`);
+                            STATE.lastAdjustmentTime = currentTime;
+                        } else if (avgFps > CONFIG.TARGET_FPS + 10 && STATE.currentSolverIterations < CONFIG.SOLVER_ITERATIONS) {
+                            // FPS comfortably above target, can increase quality
+                            STATE.currentSolverIterations = Math.min(CONFIG.SOLVER_ITERATIONS, STATE.currentSolverIterations + 1);
+                            console.log(`Adaptive: Increasing iterations to ${STATE.currentSolverIterations} (FPS: ${avgFps.toFixed(1)})`);
+                            STATE.lastAdjustmentTime = currentTime;
+                        }
+                    }
                 }
             }
         }

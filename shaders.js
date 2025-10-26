@@ -6,6 +6,7 @@ export function createShaderCode(WORKGROUP_SIZE) {
         grid_size: vec2f,
         diff: f32, visc: f32,
         N: f32, dt: f32, b: f32,
+        palette: f32,  // Color palette selector
     };
 
     fn IX(x: u32, y: u32) -> u32 {
@@ -13,9 +14,84 @@ export function createShaderCode(WORKGROUP_SIZE) {
         return y * u32(grid.x) + x;
     }
 
+    // Color palette functions
+    fn applyPalette(color: vec4f, paletteType: f32) -> vec4f {
+        let intensity = length(color.rgb);
+        if (intensity < 0.001) {
+            return vec4f(0.0, 0.0, 0.0, 1.0);
+        }
+
+        let normalizedColor = color.rgb / max(intensity, 0.001);
+
+        // 0: Rainbow (default)
+        if (paletteType < 0.5) {
+            return color;  // Keep original rainbow colors
+        }
+        // 1: Ocean
+        else if (paletteType < 1.5) {
+            let t = intensity;
+            return vec4f(
+                mix(0.0, 0.3, t),
+                mix(0.2, 0.8, t),
+                mix(0.4, 1.0, t),
+                1.0
+            );
+        }
+        // 2: Fire
+        else if (paletteType < 2.5) {
+            let t = clamp(intensity * 1.5, 0.0, 1.0);
+            var fireColor: vec3f;
+            if (t < 0.33) {
+                fireColor = mix(vec3f(0.1, 0.0, 0.0), vec3f(0.8, 0.0, 0.0), t * 3.0);
+            } else if (t < 0.66) {
+                fireColor = mix(vec3f(0.8, 0.0, 0.0), vec3f(1.0, 0.5, 0.0), (t - 0.33) * 3.0);
+            } else {
+                fireColor = mix(vec3f(1.0, 0.5, 0.0), vec3f(1.0, 1.0, 0.3), (t - 0.66) * 3.0);
+            }
+            return vec4f(fireColor, 1.0);
+        }
+        // 3: Neon
+        else if (paletteType < 3.5) {
+            let hue = atan2(normalizedColor.y - 0.5, normalizedColor.x - 0.5) / 6.28318 + 0.5;
+            let t = intensity;
+            return vec4f(
+                sin(hue * 6.28318) * 0.5 + 0.5,
+                sin((hue + 0.33) * 6.28318) * 0.5 + 0.5,
+                sin((hue + 0.66) * 6.28318) * 0.5 + 0.5,
+                1.0
+            ) * t + vec4f(0.1, 0.1, 0.1, 0.0);
+        }
+        // 4: Pastel
+        else if (paletteType < 4.5) {
+            let t = intensity * 0.7;
+            return vec4f(
+                mix(0.9, normalizedColor.r * 0.8 + 0.2, t),
+                mix(0.9, normalizedColor.g * 0.8 + 0.2, t),
+                mix(0.9, normalizedColor.b * 0.8 + 0.2, t),
+                1.0
+            );
+        }
+        // 5: Monochrome
+        else if (paletteType < 5.5) {
+            return vec4f(intensity, intensity, intensity, 1.0);
+        }
+        // 6: Sunset
+        else {
+            let t = clamp(intensity * 1.2, 0.0, 1.0);
+            var sunsetColor: vec3f;
+            if (t < 0.5) {
+                sunsetColor = mix(vec3f(0.2, 0.0, 0.3), vec3f(0.8, 0.2, 0.5), t * 2.0);
+            } else {
+                sunsetColor = mix(vec3f(0.8, 0.2, 0.5), vec3f(1.0, 0.6, 0.3), (t - 0.5) * 2.0);
+            }
+            return vec4f(sunsetColor, 1.0);
+        }
+    }
+
     @group(0) @binding(0) var<uniform> uniforms: Uniforms;
     @group(0) @binding(1) var out_texture: texture_storage_2d<rgba8unorm, write>;
     @group(0) @binding(2) var<storage> stateIn: array<vec4f>;
+    @group(0) @binding(3) var<storage> obstacles: array<vec4f>;
 
     @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
     fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
@@ -73,7 +149,27 @@ export function createShaderCode(WORKGROUP_SIZE) {
         let c1 = mix(c01, c11, fx);
         let color = mix(c0, c1, fy);
 
-        textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), vec4<f32>(color.rgb, 1.0));
+        // Sample obstacle field with bilinear interpolation for smooth edges
+        let o00 = obstacles[IX(x0 + 1, y0 + 1)].x;
+        let o10 = obstacles[IX(x1 + 1, y0 + 1)].x;
+        let o01 = obstacles[IX(x0 + 1, y1 + 1)].x;
+        let o11 = obstacles[IX(x1 + 1, y1 + 1)].x;
+
+        // Bilinear interpolation of obstacle field
+        let o0 = mix(o00, o10, fx);
+        let o1 = mix(o01, o11, fx);
+        let obstacleValue = mix(o0, o1, fy);
+
+        // Smooth transition between fluid and obstacle
+        // obstacleValue ranges from 0.0 (fluid) to 1.0 (obstacle)
+        let obstacleColor = vec4f(0.6, 0.6, 0.6, 1.0);
+        let fluidColor = applyPalette(color, uniforms.palette);
+
+        // Use smoothstep for even smoother antialiasing at obstacle edges
+        let t = smoothstep(0.3, 0.7, obstacleValue);
+        let finalColor = mix(fluidColor, obstacleColor, t);
+
+        textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), vec4<f32>(finalColor.rgb, 1.0));
     }
 `,
         drawBuffer: `
@@ -198,6 +294,7 @@ export function createShaderCode(WORKGROUP_SIZE) {
 
             @group(0) @binding(0) var<uniform> uniforms: Uniforms;
             @group(0) @binding(1) var<storage, read_write> arr: array<vec4f>;
+            @group(0) @binding(2) var<storage> obstacles: array<vec4f>;
 
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
@@ -209,27 +306,55 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 if(f32(i) >= uniforms.grid_size.x) { return; }
                 if(f32(j) >= uniforms.grid_size.y) { return; }
 
+                // Handle corners first
+                if(i == 0 && j == 0) {
+                    arr[index] = (arr[IX(1, 0)] + arr[IX(0, 1)]) * 0.5;
+                    return;
+                }
+                if(i == 0 && j == u32(N + 1)) {
+                    arr[index] = (arr[IX(1, N + 1)] + arr[IX(0, N)]) * 0.5;
+                    return;
+                }
+                if(i == u32(N + 1) && j == 0) {
+                    arr[index] = (arr[IX(N, 0)] + arr[IX(N + 1, 1)]) * 0.5;
+                    return;
+                }
+                if(i == u32(N + 1) && j == u32(N + 1)) {
+                    arr[index] = (arr[IX(N, N + 1)] + arr[IX(N + 1, N)]) * 0.5;
+                    return;
+                }
+
+                // Check if this is an obstacle cell first
+                if (obstacles[index].x > 0.5) {
+                    // Obstacle cell - set to zero (solid wall)
+                    arr[index] = vec4f(0.0, 0.0, 0.0, 0.0);
+                    return;
+                }
+
+                // Handle edges
                 if(u32(uniforms.b) == 0) {
+                    // Density boundary - just copy from adjacent cell
                     if(i == 0) { arr[index] = arr[IX(1, j)]; }
-                    if(i == u32(N + 1)) { arr[index] = arr[IX(N, j)]; }
-                    if(j == 0) { arr[index] = arr[IX(i, 1)]; }
-                    if(j == u32(N+1)) { arr[index] = arr[IX(i, N)]; }
+                    else if(i == u32(N + 1)) { arr[index] = arr[IX(N, j)]; }
+                    else if(j == 0) { arr[index] = arr[IX(i, 1)]; }
+                    else if(j == u32(N+1)) { arr[index] = arr[IX(i, N)]; }
                 } else {
+                    // Velocity boundary - reflect velocity component perpendicular to wall
                     if(i == 0) {
                         arr[index] = arr[IX(1, j)];
-                        arr[index].x *= -1;
+                        arr[index].x *= -1.0;
                     }
-                    if(i == u32(N + 1)) {
+                    else if(i == u32(N + 1)) {
                         arr[index] = arr[IX(N, j)];
-                        arr[index].x *= -1;
+                        arr[index].x *= -1.0;
                     }
-                    if(j == 0) {
+                    else if(j == 0) {
                         arr[index] = arr[IX(i, 1)];
-                        arr[index].y *= -1;
+                        arr[index].y *= -1.0;
                     }
-                    if(j == u32(N + 1)) {
+                    else if(j == u32(N + 1)) {
                         arr[index] = arr[IX(i, N)];
-                        arr[index].y *= -1;
+                        arr[index].y *= -1.0;
                     }
                 }
             }
@@ -246,34 +371,67 @@ export function createShaderCode(WORKGROUP_SIZE) {
             @group(0) @binding(0) var<uniform> uniforms: Uniforms;
             @group(0) @binding(1) var<storage, read_write> x: array<vec4f>;
             @group(0) @binding(2) var<storage> x0: array<vec4f>;
-
-            fn cellIndex(cell: vec2u, grid: vec2f) -> u32 {
-                return (cell.y + 1) * u32(grid.x) + (cell.x + 1);
-            }
-
-            fn getColorNew(cell: vec2i) -> vec4f {
-                var index = cellIndex(vec2u(cell), uniforms.grid_size);
-                return x[index];
-            }
-
-            fn getColorPrev(cell: vec2i) -> vec4f {
-                var index = cellIndex(vec2u(cell), uniforms.grid_size);
-                return x0[index];
-            }
+            @group(0) @binding(3) var<storage> obstacles: array<vec4f>;
 
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                var dt = uniforms.dt;
-                var diff = uniforms.diffuse;
-                // Scale down the diffusion coefficient for better control
-                var a = dt * diff * uniforms.N * 0.1;
-                var index = cellIndex(global_id.xy, uniforms.grid_size.xy);
-                var color = getColorPrev(vec2i(global_id.xy));
-                color += a * (getColorNew(vec2i(global_id.xy) + vec2i( 0, 1)) +
-                             getColorNew(vec2i(global_id.xy) + vec2i( 0,-1)) +
-                             getColorNew(vec2i(global_id.xy) + vec2i( 1, 0)) +
-                             getColorNew(vec2i(global_id.xy) + vec2i(-1, 0)));
-                x[index] = color / (1 + 4 * a);
+                // Direct index calculation with +1 offset for boundary
+                let i = global_id.x + 1;
+                let j = global_id.y + 1;
+                let grid_width = u32(uniforms.grid_size.x);
+                let idx = j * grid_width + i;
+
+                // Skip diffusion for obstacle cells
+                if (obstacles[idx].x > 0.5) {
+                    x[idx] = vec4f(0.0, 0.0, 0.0, 0.0);
+                    return;
+                }
+
+                // Precompute diffusion coefficient
+                let a = uniforms.dt * uniforms.diffuse * uniforms.N * 0.1;
+                let inv_denom = 1.0 / (1.0 + 4.0 * a);  // Replace division with multiplication
+
+                // Precompute neighbor indices
+                let idx_left = idx - 1;
+                let idx_right = idx + 1;
+                let idx_bottom = idx - grid_width;
+                let idx_top = idx + grid_width;
+
+                // Get center value from previous state
+                var color = x0[idx];
+
+                // Add weighted neighbor contributions from current state
+                // But zero out contributions from obstacle neighbors
+                var contrib = vec4f(0.0);
+                var count = 0.0;
+
+                if (obstacles[idx_left].x < 0.5) {
+                    contrib += x[idx_left];
+                    count += 1.0;
+                }
+                if (obstacles[idx_right].x < 0.5) {
+                    contrib += x[idx_right];
+                    count += 1.0;
+                }
+                if (obstacles[idx_bottom].x < 0.5) {
+                    contrib += x[idx_bottom];
+                    count += 1.0;
+                }
+                if (obstacles[idx_top].x < 0.5) {
+                    contrib += x[idx_top];
+                    count += 1.0;
+                }
+
+                // Adjust coefficient based on number of non-obstacle neighbors
+                if (count > 0.0) {
+                    let adjusted_a = a * count / 4.0;
+                    let adjusted_inv_denom = 1.0 / (1.0 + 4.0 * adjusted_a);
+                    color += adjusted_a * contrib;
+                    x[idx] = color * adjusted_inv_denom;
+                } else {
+                    // Surrounded by obstacles - just use previous value
+                    x[idx] = color;
+                }
             }
         `,
 
@@ -289,46 +447,82 @@ export function createShaderCode(WORKGROUP_SIZE) {
             @group(0) @binding(1) var<storage, read_write> d: array<vec4f>;
             @group(0) @binding(2) var<storage> d0: array<vec4f>;
             @group(0) @binding(3) var<storage> uv: array<vec4f>;
-
-            fn IX(cell: vec2u) -> u32 {
-                var grid = uniforms.grid_size;
-                return (cell.y) * u32(grid.x) + (cell.x);
-            }
-
-            fn IXf(x: f32, y: f32) -> u32 {
-                return IX(vec2u(u32(x), u32(y)));
-            }
+            @group(0) @binding(4) var<storage> obstacles: array<vec4f>;
 
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                var dt = uniforms.dt;
-                var N = uniforms.N;
-                var grid = uniforms.grid_size;
-                var index = IX(global_id.xy + vec2u(1));
-                var dt0 = dt*N;
-                var i = f32(global_id.x + 1);
-                var j = f32(global_id.y + 1);
+                let grid_width = u32(uniforms.grid_size.x);
+                let i = f32(global_id.x + 1);
+                let j = f32(global_id.y + 1);
+                let idx = u32(j) * grid_width + u32(i);
 
-                var x = i-dt0*uv[IXf(i,j)].x;
-                var y = j-dt0*uv[IXf(i,j)].y;
+                // Skip advection for obstacle cells
+                if (obstacles[idx].x > 0.5) {
+                    d[idx] = vec4f(0.0, 0.0, 0.0, 0.0);
+                    return;
+                }
 
-                if (x<0.5) { x=0.5; }
-                if (x>N+0.5) { x=N+ 0.5; }
-                var i0 = floor(x);
-                var i1 = i0+1;
+                // Precompute dt0 = dt * N
+                let dt0 = uniforms.dt * uniforms.N;
 
-                if (y<0.5) {y=0.5;}
-                if (y>N+0.5) {y=N+ 0.5;}
-                var j0 = floor(y);
-                var j1 = j0+1;
+                // Backtrace position
+                var x = i - dt0 * uv[idx].x;
+                var y = j - dt0 * uv[idx].y;
 
-                var s1 = x-f32(i0);
-                var s0 = 1-s1;
-                var t1 = y-f32(j0);
-                var t0 = 1-t1;
+                // Clamp to valid range
+                x = clamp(x, 0.5, uniforms.N + 0.5);
+                y = clamp(y, 0.5, uniforms.N + 0.5);
 
-                d[IXf(i,j)] = s0*(t0*d0[IXf(i0,j0)]+t1*d0[IXf(i0,j1)])+
-                              s1*(t0*d0[IXf(i1,j0)]+t1*d0[IXf(i1,j1)]);
+                // Get integer and fractional parts for bilinear interpolation
+                let i0 = floor(x);
+                let j0 = floor(y);
+                let i1 = i0 + 1.0;
+                let j1 = j0 + 1.0;
+
+                let s1 = x - i0;
+                let s0 = 1.0 - s1;
+                let t1 = y - j0;
+                let t0 = 1.0 - t1;
+
+                // Direct index calculation for bilinear samples
+                let i0u = u32(i0);
+                let i1u = u32(i1);
+                let j0u = u32(j0);
+                let j1u = u32(j1);
+
+                let idx00 = j0u * grid_width + i0u;
+                let idx10 = j0u * grid_width + i1u;
+                let idx01 = j1u * grid_width + i0u;
+                let idx11 = j1u * grid_width + i1u;
+
+                // Bilinear interpolation - zero out samples from obstacle cells
+                var sample = vec4f(0.0);
+                var weight_sum = 0.0;
+
+                if (obstacles[idx00].x < 0.5) {
+                    sample += s0 * t0 * d0[idx00];
+                    weight_sum += s0 * t0;
+                }
+                if (obstacles[idx10].x < 0.5) {
+                    sample += s1 * t0 * d0[idx10];
+                    weight_sum += s1 * t0;
+                }
+                if (obstacles[idx01].x < 0.5) {
+                    sample += s0 * t1 * d0[idx01];
+                    weight_sum += s0 * t1;
+                }
+                if (obstacles[idx11].x < 0.5) {
+                    sample += s1 * t1 * d0[idx11];
+                    weight_sum += s1 * t1;
+                }
+
+                // Normalize by weight sum if we have any non-obstacle samples
+                if (weight_sum > 0.0) {
+                    d[idx] = sample / weight_sum;
+                } else {
+                    // All samples were from obstacles - keep current value
+                    d[idx] = vec4f(0.0, 0.0, 0.0, 0.0);
+                }
             }
         `,
 
@@ -344,22 +538,27 @@ export function createShaderCode(WORKGROUP_SIZE) {
             @group(0) @binding(1) var<storage> uv: array<vec4f>;
             @group(0) @binding(2) var<storage, read_write> p_div: array<vec4f>;
 
-            fn IX(x: u32, y: u32) -> u32 {
-                var grid = uniforms.grid_size;
-                return y * u32(grid.x) + x;
-            }
-
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                var dt = uniforms.dt;
-                var N = uniforms.N;
-                var grid = uniforms.grid_size;
-                var h = 1 / N;
-                var i = global_id.x + 1;
-                var j = global_id.y + 1;
-                p_div[IX(i,j)].x = 0;
-                p_div[IX(i,j)].y = -0.5*h*(uv[IX(i+1,j)].x-uv[IX(i-1,j)].x +
-                                           uv[IX(i,j+1)].y-uv[IX(i,j-1)].y);
+                // Direct index calculation with +1 offset for boundary
+                let i = global_id.x + 1;
+                let j = global_id.y + 1;
+                let grid_width = u32(uniforms.grid_size.x);
+                let idx = j * grid_width + i;
+
+                // Precompute coefficient: -0.5 * h where h = 1/N
+                let coeff = -0.5 / uniforms.N;
+
+                // Precompute neighbor indices
+                let idx_left = idx - 1;
+                let idx_right = idx + 1;
+                let idx_bottom = idx - grid_width;
+                let idx_top = idx + grid_width;
+
+                // Calculate divergence
+                p_div[idx].x = 0.0;
+                p_div[idx].y = coeff * (uv[idx_right].x - uv[idx_left].x +
+                                        uv[idx_top].y - uv[idx_bottom].y);
             }
         `,
 
@@ -375,21 +574,26 @@ export function createShaderCode(WORKGROUP_SIZE) {
             @group(0) @binding(1) var<storage> uv: array<vec4f>;
             @group(0) @binding(2) var<storage, read_write> p_div: array<vec4f>;
 
-            fn IX(x: u32, y: u32) -> u32 {
-                var grid = uniforms.grid_size;
-                return y * u32(grid.x) + x;
-            }
-
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                var dt = uniforms.dt;
-                var N = uniforms.N;
-                var grid = uniforms.grid_size;
-                var h = 1 / N;
-                var i = global_id.x + 1;
-                var j = global_id.y + 1;
-                p_div[IX(i,j)].x = (p_div[IX(i,j)].y+p_div[IX(i-1,j)].x+p_div[IX(i+1,j)].x+
-                                   p_div[IX(i,j-1)].x+p_div[IX(i,j+1)].x)/4;
+                // Direct index calculation with +1 offset for boundary
+                let i = global_id.x + 1;
+                let j = global_id.y + 1;
+                let grid_width = u32(uniforms.grid_size.x);
+                let idx = j * grid_width + i;
+
+                // Precompute neighbor indices
+                let idx_center = idx;
+                let idx_left = idx - 1;
+                let idx_right = idx + 1;
+                let idx_bottom = idx - grid_width;
+                let idx_top = idx + grid_width;
+
+                // Average: (center.y + left.x + right.x + bottom.x + top.x) / 4
+                // Use multiplication instead of division for performance
+                p_div[idx_center].x = (p_div[idx_center].y + p_div[idx_left].x +
+                                       p_div[idx_right].x + p_div[idx_bottom].x +
+                                       p_div[idx_top].x) * 0.25;
             }
         `,
 
@@ -405,21 +609,26 @@ export function createShaderCode(WORKGROUP_SIZE) {
             @group(0) @binding(1) var<storage, read_write> uv: array<vec4f>;
             @group(0) @binding(2) var<storage> p_div: array<vec4f>;
 
-            fn IX(x: u32, y: u32) -> u32 {
-                var grid = uniforms.grid_size;
-                return y * u32(grid.x) + x;
-            }
-
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                var dt = uniforms.dt;
-                var N = uniforms.N;
-                var grid = uniforms.grid_size;
-                var h = 1 / N;
-                var i = global_id.x + 1;
-                var j = global_id.y + 1;
-                uv[IX(i,j)].x -= 1.0*(p_div[IX(i+1,j)].x-p_div[IX(i-1,j)].x)/h;
-                uv[IX(i,j)].y -= 1.0*(p_div[IX(i,j+1)].x-p_div[IX(i,j-1)].x)/h;
+                // Direct index calculation with +1 offset for boundary
+                let i = global_id.x + 1;
+                let j = global_id.y + 1;
+                let grid_width = u32(uniforms.grid_size.x);
+                let idx = j * grid_width + i;
+
+                // Precompute coefficient: -1.0 / h where h = 1/N, so this is -N
+                let coeff = -uniforms.N;
+
+                // Precompute neighbor indices
+                let idx_left = idx - 1;
+                let idx_right = idx + 1;
+                let idx_bottom = idx - grid_width;
+                let idx_top = idx + grid_width;
+
+                // Subtract pressure gradient
+                uv[idx].x += coeff * (p_div[idx_right].x - p_div[idx_left].x);
+                uv[idx].y += coeff * (p_div[idx_top].x - p_div[idx_bottom].x);
             }
         `,
 
@@ -498,41 +707,45 @@ export function createShaderCode(WORKGROUP_SIZE) {
             @group(0) @binding(1) var<storage, read_write> velocity: array<vec4f>;
             @group(0) @binding(2) var<storage> curl: array<vec4f>;
 
-            fn IX(x: u32, y: u32) -> u32 {
-                var grid = uniforms.grid_size;
-                return y * u32(grid.x) + x;
-            }
-
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                var i = global_id.x + 1;
-                var j = global_id.y + 1;
+                let i = global_id.x + 1;
+                let j = global_id.y + 1;
 
-                if(f32(i) >= uniforms.N + 1) { return; }
-                if(f32(j) >= uniforms.N + 1) { return; }
+                if(f32(i) >= uniforms.N + 1.0) { return; }
+                if(f32(j) >= uniforms.N + 1.0) { return; }
+
+                // Direct index calculation
+                let grid_width = u32(uniforms.grid_size.x);
+                let idx = j * grid_width + i;
+                let idx_left = idx - 1;
+                let idx_right = idx + 1;
+                let idx_bottom = idx - grid_width;
+                let idx_top = idx + grid_width;
 
                 // Get curl magnitude at neighboring cells
-                var curlL = abs(curl[IX(i-1, j)].x);
-                var curlR = abs(curl[IX(i+1, j)].x);
-                var curlB = abs(curl[IX(i, j-1)].x);
-                var curlT = abs(curl[IX(i, j+1)].x);
-                var curlC = curl[IX(i, j)].x;
+                let curlL = abs(curl[idx_left].x);
+                let curlR = abs(curl[idx_right].x);
+                let curlB = abs(curl[idx_bottom].x);
+                let curlT = abs(curl[idx_top].x);
+                let curlC = curl[idx].x;
 
                 // Calculate gradient of curl magnitude
-                var dx = (curlR - curlL) * 0.5;
-                var dy = (curlT - curlB) * 0.5;
+                let dx = (curlR - curlL) * 0.5;
+                let dy = (curlT - curlB) * 0.5;
 
-                // Normalize the gradient
-                var len = sqrt(dx*dx + dy*dy) + 1e-5;
-                dx /= len;
-                dy /= len;
+                // Normalize the gradient using inverseSqrt for performance
+                let len_sq = dx * dx + dy * dy + 1e-10;
+                let inv_len = inverseSqrt(len_sq);
+                let norm_dx = dx * inv_len;
+                let norm_dy = dy * inv_len;
 
-                // Vorticity confinement force (stored in diffuse uniform as strength)
-                var strength = uniforms.diffuse;
+                // Precompute force magnitude
+                let force = curlC * uniforms.diffuse * uniforms.dt;
 
                 // Apply force perpendicular to gradient, in direction of curl
-                velocity[IX(i, j)].x += dy * curlC * strength * uniforms.dt;
-                velocity[IX(i, j)].y += -dx * curlC * strength * uniforms.dt;
+                velocity[idx].x += norm_dy * force;
+                velocity[idx].y += -norm_dx * force;
             }
         `,
 
@@ -660,6 +873,34 @@ export function createShaderCode(WORKGROUP_SIZE) {
 
                 // Additive blend with intensity
                 return original + bloom * params.intensity;
+            }
+        `,
+
+        // Set obstacle - marks cells as solid (1.0) or fluid (0.0)
+        setObstacle: `
+            struct Uniforms {
+                mouse: vec2f,
+                grid_size: vec2f,
+                diff: f32, visc: f32,
+                N: f32, dt: f32, b: f32,
+            };
+
+            struct ObstacleSource {
+                value: f32,  // 1.0 to place obstacle, 0.0 to remove
+                radius: f32,
+                padding: vec2f,
+            };
+
+            @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+            @group(0) @binding(1) var<storage, read_write> obstacles: array<vec4f>;
+            @group(0) @binding(2) var<uniform> source: ObstacleSource;
+
+            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                var index = (global_id.x + 1) + u32(uniforms.grid_size.x) * (global_id.y + 1);
+                if(length(vec2f(uniforms.mouse) - vec2f((vec2f(global_id.xy) + vec2f(1)))) < source.radius) {
+                    obstacles[index].x = source.value;
+                }
             }
         `
     };

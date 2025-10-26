@@ -59,7 +59,8 @@ export function createBuffers(device, GRID_SIZE) {
         1 * 4 + // visc
         1 * 4 + // N
         1 * 4 + // dt
-        2 * 4;  // b + padding
+        1 * 4 + // b
+        1 * 4;  // palette
     const uniformColorSize = 4 * 4 + 4 * 4; // color + radius
     buffers.uniformBuffer = device.createBuffer({
         label: "Uniform buffer",
@@ -79,6 +80,11 @@ export function createBuffers(device, GRID_SIZE) {
     buffers.bloomParamsBuffer = device.createBuffer({
         label: "bloom params buffer",
         size: 2 * 4 + 2 * 4,  // threshold + intensity + padding
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    buffers.obstacleSourceBuffer = device.createBuffer({
+        label: "obstacle source buffer",
+        size: 1 * 4 + 1 * 4 + 2 * 4,  // value + radius + padding
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     // Initialize all state arrays to zero
@@ -117,12 +123,21 @@ export function createBuffers(device, GRID_SIZE) {
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
 
+    // Create obstacle buffer - stores 1.0 for solid cells, 0.0 for fluid cells
+    // We only need 1 float per cell, but use vec4f for consistency
+    buffers.obstacleBuffer = device.createBuffer({
+        label: "Obstacle Buffer",
+        size: stateArray.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
     // Initialize all buffers to zero
     device.queue.writeBuffer(buffers.densityBuffers[0], 0, stateArray);
     device.queue.writeBuffer(buffers.densityBuffers[1], 0, stateArray);
     device.queue.writeBuffer(buffers.velocityBuffers[0], 0, stateArray);
     device.queue.writeBuffer(buffers.velocityBuffers[1], 0, stateArray);
     device.queue.writeBuffer(buffers.curlBuffer, 0, stateArray);
+    device.queue.writeBuffer(buffers.obstacleBuffer, 0, stateArray);
 
     return buffers;
 }

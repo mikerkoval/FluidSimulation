@@ -1,6 +1,6 @@
-import { STATE } from './config.js';
+import { STATE, CONFIG } from './config.js';
 
-export function setupInputHandlers(canvas) {
+export function setupInputHandlers(canvas, simulation) {
     let timer;
 
     function keypress(e) {
@@ -55,5 +55,18 @@ export function setupInputHandlers(canvas) {
 
         clearTimeout(timer);
         timer = setTimeout(mouseStopped, 50);
+
+        // Mouse button down places/removes obstacles
+        if (e.buttons === 1) {
+            // Shift key removes obstacles
+            const value = e.shiftKey ? 0.0 : 1.0;
+            simulation.setObstacle(value);
+        }
+    }, false);
+
+    canvas.addEventListener('click', function(e) {
+        // Shift key removes obstacles
+        const value = e.shiftKey ? 0.0 : 1.0;
+        simulation.setObstacle(value);
     }, false);
 }

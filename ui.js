@@ -88,7 +88,12 @@ export class UIController {
             vorticityToggle: document.getElementById('vorticityToggle'),
             fadeToggle: document.getElementById('fadeToggle'),
             fpsToggle: document.getElementById('fpsToggle'),
+            adaptiveToggle: document.getElementById('adaptiveToggle'),
             fpsCounter: document.getElementById('fpsCounter'),
+            paletteSelector: document.getElementById('paletteSelector'),
+            clearObstaclesBtn: document.getElementById('clearObstaclesBtn'),
+            obstacleRadiusSlider: document.getElementById('obstacleRadiusSlider'),
+            obstacleRadiusValue: document.getElementById('obstacleRadiusValue'),
         };
 
         // Set slider values to match current CONFIG
@@ -104,9 +109,31 @@ export class UIController {
         if (this.elements.updateIntervalSlider) this.elements.updateIntervalSlider.value = CONFIG.UPDATE_INTERVAL;
         if (this.elements.solverIterationsSlider) this.elements.solverIterationsSlider.value = CONFIG.SOLVER_ITERATIONS;
         if (this.elements.displayResolutionSlider) this.elements.displayResolutionSlider.value = CONFIG.DISPLAY_RESOLUTION;
+        if (this.elements.paletteSelector) this.elements.paletteSelector.value = CONFIG.COLOR_PALETTE;
+        if (this.elements.obstacleRadiusSlider) this.elements.obstacleRadiusSlider.value = STATE.obstacleRadius;
+
+        // Initialize FPS tracking if SHOW_FPS is enabled by default
+        if (CONFIG.SHOW_FPS) {
+            STATE.frameCount = 0;
+            STATE.lastFpsTime = performance.now();
+        }
 
         // Update all displays
         this.updateAllDisplays();
+
+        // Initialize collapsible categories
+        this.initializeCollapsibleCategories();
+    }
+
+    initializeCollapsibleCategories() {
+        const categoryHeaders = document.querySelectorAll('.category-header');
+
+        categoryHeaders.forEach(header => {
+            header.addEventListener('click', () => {
+                const category = header.closest('.settings-category');
+                category.classList.toggle('collapsed');
+            });
+        });
     }
 
     updateAllDisplays() {
@@ -122,6 +149,7 @@ export class UIController {
         this.updateSliderDisplay('updateInterval', CONFIG.UPDATE_INTERVAL, 'ms');
         this.updateSliderDisplay('solverIterations', CONFIG.SOLVER_ITERATIONS);
         this.updateSliderDisplay('displayResolution', CONFIG.DISPLAY_RESOLUTION);
+        this.updateSliderDisplay('obstacleRadius', STATE.obstacleRadius);
     }
 
     updateSliderDisplay(name, value, suffix = '') {
@@ -286,6 +314,35 @@ export class UIController {
                 STATE.frameCount = 0;
                 STATE.lastFpsTime = performance.now();
             }
+        });
+
+        // Adaptive Performance toggle
+        this.elements.adaptiveToggle?.addEventListener('click', () => {
+            CONFIG.ENABLE_ADAPTIVE_PERFORMANCE = !CONFIG.ENABLE_ADAPTIVE_PERFORMANCE;
+            this.elements.adaptiveToggle.classList.toggle('active');
+            const span = this.elements.adaptiveToggle.querySelector('span');
+            if (span) span.textContent = CONFIG.ENABLE_ADAPTIVE_PERFORMANCE ? 'Enabled' : 'Disabled';
+
+            // Reset to default iterations when disabled
+            if (!CONFIG.ENABLE_ADAPTIVE_PERFORMANCE) {
+                STATE.currentSolverIterations = CONFIG.SOLVER_ITERATIONS;
+                STATE.fpsHistory = [];
+                console.log(`Adaptive Performance disabled. Iterations reset to ${CONFIG.SOLVER_ITERATIONS}`);
+            } else {
+                console.log(`Adaptive Performance enabled. Target FPS: ${CONFIG.TARGET_FPS}`);
+            }
+        });
+
+        // Color Palette selector
+        this.elements.paletteSelector?.addEventListener('change', (e) => {
+            CONFIG.COLOR_PALETTE = e.target.value;
+            console.log(`Color palette changed to: ${CONFIG.COLOR_PALETTE}`);
+        });
+
+        // Obstacle Radius slider
+        this.elements.obstacleRadiusSlider?.addEventListener('input', (e) => {
+            STATE.obstacleRadius = parseInt(e.target.value);
+            this.updateSliderDisplay('obstacleRadius', e.target.value);
         });
     }
 
