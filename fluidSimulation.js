@@ -91,7 +91,8 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
             { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
             { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} },
             { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} },
-            { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: {} }
+            { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: {} },
+            { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} }
         ]
     });
 
@@ -431,7 +432,8 @@ export class FluidSimulation {
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.densityBuffers[0] } },
                     { binding: 2, resource: { buffer: this.buffers.densityBuffers[1] } },
-                    { binding: 3, resource: { buffer: this.buffers.addDensityBuffer } }
+                    { binding: 3, resource: { buffer: this.buffers.addDensityBuffer } },
+                    { binding: 4, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -441,7 +443,8 @@ export class FluidSimulation {
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.densityBuffers[1] } },
                     { binding: 2, resource: { buffer: this.buffers.densityBuffers[0] } },
-                    { binding: 3, resource: { buffer: this.buffers.addDensityBuffer } }
+                    { binding: 3, resource: { buffer: this.buffers.addDensityBuffer } },
+                    { binding: 4, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             })
         ];
@@ -454,7 +457,8 @@ export class FluidSimulation {
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.velocityBuffers[0] } },
                     { binding: 2, resource: { buffer: this.buffers.velocityBuffers[1] } },
-                    { binding: 3, resource: { buffer: this.buffers.addVelocityBuffer } }
+                    { binding: 3, resource: { buffer: this.buffers.addVelocityBuffer } },
+                    { binding: 4, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             }),
             this.device.createBindGroup({
@@ -464,7 +468,8 @@ export class FluidSimulation {
                     { binding: 0, resource: { buffer: this.buffers.uniformBuffer } },
                     { binding: 1, resource: { buffer: this.buffers.velocityBuffers[1] } },
                     { binding: 2, resource: { buffer: this.buffers.velocityBuffers[0] } },
-                    { binding: 3, resource: { buffer: this.buffers.addVelocityBuffer } }
+                    { binding: 3, resource: { buffer: this.buffers.addVelocityBuffer } },
+                    { binding: 4, resource: { buffer: this.buffers.obstacleBuffer } }
                 ]
             })
         ];
@@ -1179,17 +1184,42 @@ export class FluidSimulation {
         const dx = STATE.mousePosition.x - STATE.mousePosition.x0;
         const dy = -1 * (STATE.mousePosition.y - STATE.mousePosition.y0);
 
-        // Generate vibrant, saturated colors with full range
-        const r = 0.5 + 0.5 * Math.sin(STATE.step / 20);
-        const g = 0.5 + 0.5 * Math.cos(STATE.step / 25);
-        const b = 0.5 + 0.5 * Math.sin(STATE.step / 30);
+        // Calculate mouse velocity for color modulation
+        const mouseVelocity = Math.sqrt(dx * dx + dy * dy);
+
+        // Generate rainbow colors that cycle through the spectrum
+        // Base cycling with optional velocity boost
+        const baseHue = (STATE.step * 2) % 360; // Slow base rotation through rainbow
+        const velocityBoost = mouseVelocity * 5; // Fast movement adds to hue
+        const hue = (baseHue + velocityBoost) % 360;
+
+        // Convert HSV to RGB (H=hue, S=1.0 for vibrant, V=1.0 for bright)
+        // Using standard HSV to RGB algorithm
+        const h = hue / 60;
+        const c = 1.0; // Chroma
+        const x = 1.0 - Math.abs((h % 2) - 1);
+
+        let r1, g1, b1;
+        if (h >= 0 && h < 1) { r1 = 1; g1 = x; b1 = 0; }
+        else if (h >= 1 && h < 2) { r1 = x; g1 = 1; b1 = 0; }
+        else if (h >= 2 && h < 3) { r1 = 0; g1 = 1; b1 = x; }
+        else if (h >= 3 && h < 4) { r1 = 0; g1 = x; b1 = 1; }
+        else if (h >= 4 && h < 5) { r1 = x; g1 = 0; b1 = 1; }
+        else { r1 = 1; g1 = 0; b1 = x; }
+
+        // Scale down the color intensity to avoid adding too much
+        const intensity = 0.3; // Reduce from 1.0 to make it more subtle
+        const r = r1 * intensity;
+        const g = g1 * intensity;
+        const b = b1 * intensity;
 
         const addSourceArr = new Float32Array([
             r, g, b, 1,
             CONFIG.COLOR_RADIUS, 0, 0, 0
         ]);
 
-        if (dx !== 0 || dy !== 0) {
+        // Only add density if not in velocity-only mode
+        if (!STATE.velocityOnlyMode && (dx !== 0 || dy !== 0)) {
             this.device.queue.writeBuffer(this.buffers.addDensityBuffer, 0, addSourceArr);
             this.addSource(
                 densityBuffers[STATE.densityStep % 2],

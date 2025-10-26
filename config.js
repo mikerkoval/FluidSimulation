@@ -11,7 +11,7 @@ export const CONFIG = {
     DRAW_VELOCITY: 2,
     SOLVER_ITERATIONS: 10,  // More iterations for better quality at 64 grid
     DISPLAY_RESOLUTION: 512,
-    FADE: 0.98,  // Slightly faster fade for better visual
+    FADE: 0.95,  // Faster fade to prevent colors from mixing into mud
     VORTICITY: 0.5,  // Higher vorticity for more pronounced swirls
     BLOOM_INTENSITY: 0.4,  // Bloom glow strength (0 = off, higher = more glow)
     BLOOM_THRESHOLD: 0.7,  // Brightness threshold for bloom (0-1)
@@ -73,5 +73,7 @@ export const STATE = {
     adjustmentCooldown: 2000,  // Wait 2 seconds between adjustments
     // Obstacle mode
     obstacleMode: true,  // Always enabled
-    obstacleRadius: 3
+    obstacleRadius: 3,
+    // Velocity only mode - don't add density, just velocity
+    velocityOnlyMode: false
 };

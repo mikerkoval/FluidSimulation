@@ -18,6 +18,10 @@ export function setupInputHandlers(canvas, simulation) {
                 STATE.drawState = CONFIG.DRAW_DENSITY;
             }
         }
+        if (key === "v") {
+            STATE.velocityOnlyMode = !STATE.velocityOnlyMode;
+            console.log(`Velocity only mode: ${STATE.velocityOnlyMode ? 'ON' : 'OFF'}`);
+        }
     }
 
     function getMousePos(canvas, e) {

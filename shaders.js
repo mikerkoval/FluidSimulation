@@ -268,13 +268,18 @@ export function createShaderCode(WORKGROUP_SIZE) {
             @group(0) @binding(1) var<storage, read_write> stateOut: array<vec4f>;
             @group(0) @binding(2) var<storage> stateIn: array<vec4f>;
             @group(0) @binding(3) var<uniform> source: Source;
+            @group(0) @binding(4) var<storage> obstacles: array<vec4f>;
 
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
                 var index = (global_id.x + 1) + u32(uniforms.grid_size.x) * (global_id.y + 1);
                 stateOut[index] = stateIn[index];
-                if(length(vec2f(uniforms.mouse) - vec2f((vec2f(global_id.xy) + vec2f(1)))) < source.radius) {
-                    stateOut[index] += source.color;
+
+                // Don't add density/velocity to obstacle cells
+                if (obstacles[index].x < 0.5) {
+                    if(length(vec2f(uniforms.mouse) - vec2f((vec2f(global_id.xy) + vec2f(1)))) < source.radius) {
+                        stateOut[index] += source.color;
+                    }
                 }
             }
         `,
@@ -401,35 +406,27 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 var color = x0[idx];
 
                 // Add weighted neighbor contributions from current state
-                // But zero out contributions from obstacle neighbors
-                var contrib = vec4f(0.0);
-                var count = 0.0;
+                // For obstacle neighbors, use zero (no-flux boundary)
+                var left_val = x[idx_left];
+                var right_val = x[idx_right];
+                var bottom_val = x[idx_bottom];
+                var top_val = x[idx_top];
+                var neighbor_count = 4.0;
 
-                if (obstacles[idx_left].x < 0.5) {
-                    contrib += x[idx_left];
-                    count += 1.0;
-                }
-                if (obstacles[idx_right].x < 0.5) {
-                    contrib += x[idx_right];
-                    count += 1.0;
-                }
-                if (obstacles[idx_bottom].x < 0.5) {
-                    contrib += x[idx_bottom];
-                    count += 1.0;
-                }
-                if (obstacles[idx_top].x < 0.5) {
-                    contrib += x[idx_top];
-                    count += 1.0;
-                }
+                // If neighbor is obstacle, treat as zero flux (use center value from previous step)
+                if (obstacles[idx_left].x > 0.5) { left_val = color; neighbor_count -= 1.0; }
+                if (obstacles[idx_right].x > 0.5) { right_val = color; neighbor_count -= 1.0; }
+                if (obstacles[idx_bottom].x > 0.5) { bottom_val = color; neighbor_count -= 1.0; }
+                if (obstacles[idx_top].x > 0.5) { top_val = color; neighbor_count -= 1.0; }
 
-                // Adjust coefficient based on number of non-obstacle neighbors
-                if (count > 0.0) {
-                    let adjusted_a = a * count / 4.0;
+                // Adjust diffusion based on number of valid neighbors
+                if (neighbor_count > 0.0) {
+                    let adjusted_a = a * neighbor_count / 4.0;
                     let adjusted_inv_denom = 1.0 / (1.0 + 4.0 * adjusted_a);
-                    color += adjusted_a * contrib;
+                    color += adjusted_a * (left_val + right_val + bottom_val + top_val);
                     x[idx] = color * adjusted_inv_denom;
                 } else {
-                    // Surrounded by obstacles - just use previous value
+                    // Completely surrounded by obstacles
                     x[idx] = color;
                 }
             }
@@ -495,33 +492,29 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let idx01 = j1u * grid_width + i0u;
                 let idx11 = j1u * grid_width + i1u;
 
-                // Bilinear interpolation - zero out samples from obstacle cells
-                var sample = vec4f(0.0);
-                var weight_sum = 0.0;
+                // Bilinear interpolation - skip obstacle samples
+                var v00 = d0[idx00];
+                var v10 = d0[idx10];
+                var v01 = d0[idx01];
+                var v11 = d0[idx11];
 
-                if (obstacles[idx00].x < 0.5) {
-                    sample += s0 * t0 * d0[idx00];
-                    weight_sum += s0 * t0;
-                }
-                if (obstacles[idx10].x < 0.5) {
-                    sample += s1 * t0 * d0[idx10];
-                    weight_sum += s1 * t0;
-                }
-                if (obstacles[idx01].x < 0.5) {
-                    sample += s0 * t1 * d0[idx01];
-                    weight_sum += s0 * t1;
-                }
-                if (obstacles[idx11].x < 0.5) {
-                    sample += s1 * t1 * d0[idx11];
-                    weight_sum += s1 * t1;
-                }
+                var w00 = s0 * t0;
+                var w10 = s1 * t0;
+                var w01 = s0 * t1;
+                var w11 = s1 * t1;
 
-                // Normalize by weight sum if we have any non-obstacle samples
-                if (weight_sum > 0.0) {
-                    d[idx] = sample / weight_sum;
+                // If sample point is in obstacle, zero out that sample and weight
+                if (obstacles[idx00].x > 0.5) { v00 = vec4f(0.0); w00 = 0.0; }
+                if (obstacles[idx10].x > 0.5) { v10 = vec4f(0.0); w10 = 0.0; }
+                if (obstacles[idx01].x > 0.5) { v01 = vec4f(0.0); w01 = 0.0; }
+                if (obstacles[idx11].x > 0.5) { v11 = vec4f(0.0); w11 = 0.0; }
+
+                // Weighted bilinear interpolation with renormalization
+                let total_weight = w00 + w10 + w01 + w11;
+                if (total_weight > 0.0) {
+                    d[idx] = (w00 * v00 + w10 * v10 + w01 * v01 + w11 * v11) / total_weight;
                 } else {
-                    // All samples were from obstacles - keep current value
-                    d[idx] = vec4f(0.0, 0.0, 0.0, 0.0);
+                    d[idx] = vec4f(0.0);
                 }
             }
         `,
