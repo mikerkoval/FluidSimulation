@@ -171,8 +171,8 @@ export class FluidSolver {
 
         const dx = STATE.mousePosition.x - STATE.mousePosition.x0;
         const dy = -1 * (STATE.mousePosition.y - STATE.mousePosition.y0);
-        const forceDx = dx * CONFIG.VELOCITY_FORCE_MULTIPLIER;
-        const forceDy = dy * CONFIG.VELOCITY_FORCE_MULTIPLIER;
+        const forceDx = dx * CONFIG.VELOCITY_FORCE_MULTIPLIER * 0.1;
+        const forceDy = dy * CONFIG.VELOCITY_FORCE_MULTIPLIER * 0.1;
 
         const addSourceArr = new Float32Array([
             forceDx, forceDy, 0, 0,
