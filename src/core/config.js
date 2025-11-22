@@ -3,9 +3,9 @@ export const CONFIG = {
     VISCOSITY: 0,
     N: 64,
     GRID_SIZE: 66,  // N + 2 for boundary
-    COLOR_RADIUS: 3,
+    COLOR_RADIUS: 2,
     VELOCITY_RADIUS: 2,
-    VELOCITY_FORCE_MULTIPLIER: 3.0,
+    VELOCITY_FORCE_MULTIPLIER: 1.0,
     WORKGROUP_SIZE: 16,
     UPDATE_INTERVAL: 16,  // ~60fps
     DRAW_DENSITY: 1,
