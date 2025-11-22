@@ -5,7 +5,7 @@ export const CONFIG = {
     GRID_SIZE: 66,  // N + 2 for boundary
     COLOR_RADIUS: 2,
     VELOCITY_RADIUS: 2,
-    VELOCITY_FORCE_MULTIPLIER: 1.0,
+    VELOCITY_FORCE_MULTIPLIER: 0.5,
     WORKGROUP_SIZE: 16,
     UPDATE_INTERVAL: 16,  // ~60fps
     DRAW_DENSITY: 1,

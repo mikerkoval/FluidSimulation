@@ -219,9 +219,9 @@ export class FluidSolver {
         const dx = STATE.mousePosition.x - STATE.mousePosition.x0;
         const dy = -1 * (STATE.mousePosition.y - STATE.mousePosition.y0);
         const t = STATE.step * 0.01;
-        const r = (Math.sin(t) + 1) * 0.05;
-        const g = (Math.sin(t + 2) + 1) * 0.05;
-        const b = (Math.sin(t + 4) + 1) * 0.05;
+        const r = (Math.sin(t) + 1) * 0.1;
+        const g = (Math.sin(t + 2) + 1) * 0.1;
+        const b = (Math.sin(t + 4) + 1) * 0.1;
 
         const addSourceArr = new Float32Array([
             r, g, b, 1,
