@@ -1,28 +1,27 @@
 import { CONFIG, STATE } from '../core/config.js';
 
+export function loadSettingsFromURL() {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.has('diffuse')) CONFIG.DIFFUSE = parseFloat(params.get('diffuse'));
+    if (params.has('viscosity')) CONFIG.VISCOSITY = parseFloat(params.get('viscosity'));
+    if (params.has('gridSize')) {
+        CONFIG.N = parseInt(params.get('gridSize'));
+        CONFIG.GRID_SIZE = CONFIG.N + 2;
+    }
+    if (params.has('colorRadius')) CONFIG.COLOR_RADIUS = parseInt(params.get('colorRadius'));
+    if (params.has('velocityRadius')) CONFIG.VELOCITY_RADIUS = parseInt(params.get('velocityRadius'));
+    if (params.has('updateInterval')) CONFIG.UPDATE_INTERVAL = parseInt(params.get('updateInterval'));
+    if (params.has('solverIterations')) CONFIG.SOLVER_ITERATIONS = parseInt(params.get('solverIterations'));
+    if (params.has('displayResolution')) CONFIG.DISPLAY_RESOLUTION = parseInt(params.get('displayResolution'));
+    STATE.diffuseState = CONFIG.DIFFUSE;
+}
+
 export class UIController {
     constructor() {
         this.elements = {};
-        this.loadSettingsFromURL();
         this.initializeUI();
         this.attachEventListeners();
-    }
-
-    loadSettingsFromURL() {
-        const params = new URLSearchParams(window.location.search);
-
-        if (params.has('diffuse')) CONFIG.DIFFUSE = parseFloat(params.get('diffuse'));
-        if (params.has('viscosity')) CONFIG.VISCOSITY = parseFloat(params.get('viscosity'));
-        if (params.has('gridSize')) {
-            CONFIG.N = parseInt(params.get('gridSize'));
-            CONFIG.GRID_SIZE = CONFIG.N + 2;
-        }
-        if (params.has('colorRadius')) CONFIG.COLOR_RADIUS = parseInt(params.get('colorRadius'));
-        if (params.has('velocityRadius')) CONFIG.VELOCITY_RADIUS = parseInt(params.get('velocityRadius'));
-        if (params.has('updateInterval')) CONFIG.UPDATE_INTERVAL = parseInt(params.get('updateInterval'));
-        if (params.has('solverIterations')) CONFIG.SOLVER_ITERATIONS = parseInt(params.get('solverIterations'));
-        if (params.has('displayResolution')) CONFIG.DISPLAY_RESOLUTION = parseInt(params.get('displayResolution'));
-        STATE.diffuseState = CONFIG.DIFFUSE;
     }
 
     saveSettingsToURL() {

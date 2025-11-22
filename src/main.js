@@ -3,10 +3,12 @@ import { initGPU, createVertexBuffer, createBuffers, createTexture } from './gpu
 import { createPipelines } from './gpu/pipelines.js';
 import { FluidSimulation } from './core/FluidSimulation.js';
 import { setupInputHandlers } from './ui/input.js';
-import { initializeUI } from './ui/ui.js';
+import { initializeUI, loadSettingsFromURL } from './ui/ui.js';
 
 async function main() {
     try {
+        loadSettingsFromURL();
+
         const canvas = document.querySelector("canvas");
 
         function resizeCanvas() {
