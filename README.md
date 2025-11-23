@@ -4,6 +4,8 @@ A GPU-accelerated implementation of Jos Stam's stable fluids algorithm using Web
 
 **[Live Demo](https://mikerkoval.github.io/FluidSimulation/)**
 
+![Fluid Simulation Demo](images/demo.gif)
+
 ## Overview
 
 This project implements the fluid dynamics algorithm from Jos Stam's "Real-Time Fluid Dynamics for Games" (GDC 2003). The entire simulation runs on the GPU using WebGPU compute shaders written in WGSL.
