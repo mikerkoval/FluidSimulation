@@ -163,6 +163,39 @@ export class FluidSolver {
         this.device.queue.submit([encoder.finish()]);
     }
 
+    applyVorticityConfinement(velocityBuffer) {
+        if (CONFIG.VORTICITY === 0) return;
+
+        const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
+        const bufferIndex = (velocityBuffer === this.buffers.velocityBuffers[0]) ? 0 : 1;
+
+        this.setUniforms(0);
+        const encoder = this.device.createCommandEncoder();
+
+        let computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.vorticity.program);
+        computePass.setBindGroup(0, this.bindGroups.vorticity[bufferIndex]);
+        computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
+        computePass.end();
+
+        const vorticityUniform = new Float32Array([
+            0, 0,
+            CONFIG.GRID_SIZE, CONFIG.GRID_SIZE,
+            0, CONFIG.VORTICITY,
+            CONFIG.N, CONFIG.UPDATE_INTERVAL / 1000,
+            0, 0
+        ]);
+        this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, vorticityUniform);
+
+        computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.vorticityConfinement.program);
+        computePass.setBindGroup(0, this.bindGroups.vorticityConfinement[bufferIndex]);
+        computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
+        computePass.end();
+
+        this.device.queue.submit([encoder.finish()]);
+    }
+
     updateVelocity() {
         STATE.diffuseState = CONFIG.VISCOSITY;
         const velocityBuffers = this.buffers.velocityBuffers;
@@ -207,6 +240,8 @@ export class FluidSolver {
         // Project again
         this.project(velocityBuffers[STATE.velocityStep % 2],
                      velocityBuffers[(STATE.velocityStep + 1) % 2]);
+
+        this.applyVorticityConfinement(velocityBuffers[STATE.velocityStep % 2]);
     }
 
     updateDensity() {

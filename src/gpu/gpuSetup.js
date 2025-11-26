@@ -104,9 +104,15 @@ export function createBuffers(device, GRID_SIZE) {
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         })
     ];
+    buffers.vorticityBuffer = device.createBuffer({
+        label: "Vorticity Buffer",
+        size: stateArray.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
     device.queue.writeBuffer(buffers.densityBuffers[0], 0, stateArray);
     device.queue.writeBuffer(buffers.densityBuffers[1], 0, stateArray);
     device.queue.writeBuffer(buffers.velocityBuffers[0], 0, stateArray);
+    device.queue.writeBuffer(buffers.vorticityBuffer, 0, stateArray);
     device.queue.writeBuffer(buffers.velocityBuffers[1], 0, stateArray);
 
     return buffers;

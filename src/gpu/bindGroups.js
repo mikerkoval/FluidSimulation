@@ -328,5 +328,48 @@ export function createBindGroups(device, buffers, pipelines, texture, sampler) {
             ]
         })
     ];
+
+    bindGroups.vorticity = [
+        device.createBindGroup({
+            label: "Vorticity 0 bind group",
+            layout: pipelines.vorticity.layout,
+            entries: [
+                { binding: 0, resource: { buffer: buffers.uniformBuffer } },
+                { binding: 1, resource: { buffer: buffers.vorticityBuffer } },
+                { binding: 2, resource: { buffer: buffers.velocityBuffers[0] } }
+            ]
+        }),
+        device.createBindGroup({
+            label: "Vorticity 1 bind group",
+            layout: pipelines.vorticity.layout,
+            entries: [
+                { binding: 0, resource: { buffer: buffers.uniformBuffer } },
+                { binding: 1, resource: { buffer: buffers.vorticityBuffer } },
+                { binding: 2, resource: { buffer: buffers.velocityBuffers[1] } }
+            ]
+        })
+    ];
+
+    bindGroups.vorticityConfinement = [
+        device.createBindGroup({
+            label: "Vorticity Confinement 0 bind group",
+            layout: pipelines.vorticityConfinement.layout,
+            entries: [
+                { binding: 0, resource: { buffer: buffers.uniformBuffer } },
+                { binding: 1, resource: { buffer: buffers.velocityBuffers[0] } },
+                { binding: 2, resource: { buffer: buffers.vorticityBuffer } }
+            ]
+        }),
+        device.createBindGroup({
+            label: "Vorticity Confinement 1 bind group",
+            layout: pipelines.vorticityConfinement.layout,
+            entries: [
+                { binding: 0, resource: { buffer: buffers.uniformBuffer } },
+                { binding: 1, resource: { buffer: buffers.velocityBuffers[1] } },
+                { binding: 2, resource: { buffer: buffers.vorticityBuffer } }
+            ]
+        })
+    ];
+
     return bindGroups;
 }

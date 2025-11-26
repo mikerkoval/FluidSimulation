@@ -211,5 +211,51 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
         })
     };
 
+    const vorticityModule = device.createShaderModule({
+        label: "vorticity shader",
+        code: shaders.vorticity
+    });
+
+    const vorticityLayout = device.createBindGroupLayout({
+        label: "Vorticity Bind Group Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} },
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} }
+        ]
+    });
+
+    pipelines.vorticity = {
+        layout: vorticityLayout,
+        program: device.createComputePipeline({
+            label: "vorticity pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [vorticityLayout] }),
+            compute: { module: vorticityModule, entryPoint: "computeMain" }
+        })
+    };
+
+    const vorticityConfinementModule = device.createShaderModule({
+        label: "vorticity confinement shader",
+        code: shaders.vorticityConfinement
+    });
+
+    const vorticityConfinementLayout = device.createBindGroupLayout({
+        label: "Vorticity Confinement Bind Group Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} },
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage"} }
+        ]
+    });
+
+    pipelines.vorticityConfinement = {
+        layout: vorticityConfinementLayout,
+        program: device.createComputePipeline({
+            label: "vorticity confinement pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [vorticityConfinementLayout] }),
+            compute: { module: vorticityConfinementModule, entryPoint: "computeMain" }
+        })
+    };
+
     return pipelines;
 }

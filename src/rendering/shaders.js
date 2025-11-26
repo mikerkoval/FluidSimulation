@@ -446,6 +446,65 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 uv[idx].x += coeff * (p_div[idx_right].x - p_div[idx_left].x);
                 uv[idx].y += coeff * (p_div[idx_top].x - p_div[idx_bottom].x);
             }
+        `,
+
+        vorticity: `
+            @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+            @group(0) @binding(1) var<storage, read_write> vort: array<vec4f>;
+            @group(0) @binding(2) var<storage> uv: array<vec4f>;
+
+            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                let N = u32(uniforms.N);
+                let x = global_id.x + 1;
+                let y = global_id.y + 1;
+
+                if (x > N || y > N) { return; }
+
+                let grid_width = u32(uniforms.grid_size.x);
+                let idx = y * grid_width + x;
+                let idx_left = idx - 1;
+                let idx_right = idx + 1;
+                let idx_bottom = idx - grid_width;
+                let idx_top = idx + grid_width;
+
+                let du_dy = (uv[idx_top].x - uv[idx_bottom].x) * 0.5;
+                let dv_dx = (uv[idx_right].y - uv[idx_left].y) * 0.5;
+
+                vort[idx].x = du_dy - dv_dx;
+            }
+        `,
+
+        vorticityConfinement: `
+            @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+            @group(0) @binding(1) var<storage, read_write> uv: array<vec4f>;
+            @group(0) @binding(2) var<storage> vort: array<vec4f>;
+
+            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                let N = u32(uniforms.N);
+                let x = global_id.x + 1;
+                let y = global_id.y + 1;
+
+                if (x > N || y > N) { return; }
+
+                let grid_width = u32(uniforms.grid_size.x);
+                let idx = y * grid_width + x;
+                let idx_left = idx - 1;
+                let idx_right = idx + 1;
+                let idx_bottom = idx - grid_width;
+                let idx_top = idx + grid_width;
+
+                let dw_dx = (abs(vort[idx_right].x) - abs(vort[idx_left].x)) * 0.5;
+                let dw_dy = (abs(vort[idx_top].x) - abs(vort[idx_bottom].x)) * 0.5;
+
+                let length = sqrt(dw_dx * dw_dx + dw_dy * dw_dy) + 0.000001;
+                let force_x = (dw_dy / length) * vort[idx].x;
+                let force_y = -(dw_dx / length) * vort[idx].x;
+
+                uv[idx].x += uniforms.visc * uniforms.dt * force_x;
+                uv[idx].y += uniforms.visc * uniforms.dt * force_y;
+            }
         `
     };
 }
