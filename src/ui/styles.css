@@ -333,7 +333,6 @@ button.reload {
 
 /* Hide unsupported Stam features */
 #fadeSlider, #fadeValue, #fadeToggle,
-#vorticitySlider, #vorticityValue, #vorticityToggle,
 #bloomIntensitySlider, #bloomIntensityValue,
 #bloomThresholdSlider, #bloomThresholdValue, #bloomToggle,
 #clearObstaclesBtn, #obstacleRadiusSlider, #obstacleRadiusValue,
@@ -343,7 +342,6 @@ button.reload {
 
 /* Hide parent control groups of unsupported features */
 #fadeSlider:is(*),
-#vorticitySlider:is(*),
 #bloomIntensitySlider:is(*),
 #bloomThresholdSlider:is(*),
 #obstacleRadiusSlider:is(*) {
@@ -352,7 +350,6 @@ button.reload {
 
 /* Hide labels and info text for hidden features */
 label:has(+ #fadeSlider),
-label:has(+ #vorticitySlider),
 label:has(+ #bloomIntensitySlider),
 label:has(+ #bloomThresholdSlider),
 label:has(+ #obstacleRadiusSlider),
@@ -366,7 +363,6 @@ label:has(+ #obstacleRadiusSlider),
 
 /* Hide the control groups themselves */
 .control-group:has(#fadeSlider),
-.control-group:has(#vorticitySlider),
 .control-group:has(#bloomIntensitySlider),
 .control-group:has(#bloomThresholdSlider),
 .control-group:has(#fadeToggle),
