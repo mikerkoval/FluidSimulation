@@ -502,8 +502,8 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let force_x = (dw_dy / length) * vort[idx].x;
                 let force_y = -(dw_dx / length) * vort[idx].x;
 
-                uv[idx].x += uniforms.visc * uniforms.dt * force_x;
-                uv[idx].y += uniforms.visc * uniforms.dt * force_y;
+                uv[idx].x += uniforms.visc * uniforms.dt * force_x * 10.0;
+                uv[idx].y += uniforms.visc * uniforms.dt * force_y * 10.0;
             }
         `
     };
