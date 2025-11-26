@@ -337,8 +337,15 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let t0 = 1.0 - t1;
 
                 // Stam's formula: d[i,j] = s0*(t0*d0[i0,j0]+t1*d0[i0,j1]) + s1*(t0*d0[i1,j0]+t1*d0[i1,j1])
-                d[idx] = s0 * (t0 * d0[j0 * grid_width + i0] + t1 * d0[j1 * grid_width + i0]) +
-                         s1 * (t0 * d0[j0 * grid_width + i1] + t1 * d0[j1 * grid_width + i1]);
+                let advected = s0 * (t0 * d0[j0 * grid_width + i0] + t1 * d0[j1 * grid_width + i0]) +
+                               s1 * (t0 * d0[j0 * grid_width + i1] + t1 * d0[j1 * grid_width + i1]);
+
+                // Preserve velocity energy (only for velocity fields, not density)
+                if (uniforms.b == 1 || uniforms.b == 2) {
+                    d[idx] = advected * 1.002;
+                } else {
+                    d[idx] = advected;
+                }
             }
         `,
 
