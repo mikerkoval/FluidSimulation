@@ -342,7 +342,7 @@ export function createShaderCode(WORKGROUP_SIZE) {
 
                 // Preserve velocity energy (only for velocity fields, not density)
                 if (uniforms.b == 1 || uniforms.b == 2) {
-                    d[idx] = advected * 1.01;
+                    d[idx] = advected * 1.05;
                 } else {
                     d[idx] = advected;
                 }
@@ -509,8 +509,8 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let force_x = (dw_dy / length) * vort[idx].x;
                 let force_y = -(dw_dx / length) * vort[idx].x;
 
-                uv[idx].x += uniforms.visc * uniforms.dt * force_x * 10.0;
-                uv[idx].y += uniforms.visc * uniforms.dt * force_y * 10.0;
+                uv[idx].x += uniforms.visc * uniforms.dt * force_x * 50.0;
+                uv[idx].y += uniforms.visc * uniforms.dt * force_y * 50.0;
             }
         `
     };
