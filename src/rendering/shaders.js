@@ -342,7 +342,7 @@ export function createShaderCode(WORKGROUP_SIZE) {
 
                 // Preserve velocity energy (only for velocity fields, not density)
                 if (uniforms.b == 1 || uniforms.b == 2) {
-                    d[idx] = advected * 1.05;
+                    d[idx] = advected * 1.0;
                 } else {
                     d[idx] = advected;
                 }
