@@ -47,6 +47,8 @@ export class UIController {
             viscosityValue: document.getElementById('viscosityValue'),
             vorticitySlider: document.getElementById('vorticitySlider'),
             vorticityValue: document.getElementById('vorticityValue'),
+            gravitySlider: document.getElementById('gravitySlider'),
+            gravityValue: document.getElementById('gravityValue'),
             gridSizeSlider: document.getElementById('gridSizeSlider'),
             gridSizeValue: document.getElementById('gridSizeValue'),
             colorRadiusSlider: document.getElementById('colorRadiusSlider'),
@@ -73,6 +75,7 @@ export class UIController {
         if (this.elements.diffuseSlider) this.elements.diffuseSlider.value = CONFIG.DIFFUSE;
         if (this.elements.viscositySlider) this.elements.viscositySlider.value = CONFIG.VISCOSITY;
         if (this.elements.vorticitySlider) this.elements.vorticitySlider.value = CONFIG.VORTICITY;
+        if (this.elements.gravitySlider) this.elements.gravitySlider.value = CONFIG.GRAVITY;
         if (this.elements.gridSizeSlider) this.elements.gridSizeSlider.value = CONFIG.N;
         if (this.elements.colorRadiusSlider) this.elements.colorRadiusSlider.value = CONFIG.COLOR_RADIUS;
         if (this.elements.velocityRadiusSlider) this.elements.velocityRadiusSlider.value = CONFIG.VELOCITY_RADIUS;
@@ -102,6 +105,7 @@ export class UIController {
         this.updateSliderDisplay('diffuse', CONFIG.DIFFUSE.toFixed(3));
         this.updateSliderDisplay('viscosity', CONFIG.VISCOSITY.toFixed(3));
         this.updateSliderDisplay('vorticity', CONFIG.VORTICITY.toFixed(3));
+        this.updateSliderDisplay('gravity', CONFIG.GRAVITY.toFixed(3));
         this.updateSliderDisplay('gridSize', CONFIG.N);
         this.updateSliderDisplay('colorRadius', CONFIG.COLOR_RADIUS);
         this.updateSliderDisplay('velocityRadius', CONFIG.VELOCITY_RADIUS);
@@ -130,6 +134,10 @@ export class UIController {
         this.elements.vorticitySlider?.addEventListener('input', (e) => {
             CONFIG.VORTICITY = parseFloat(e.target.value);
             this.updateSliderDisplay('vorticity', parseFloat(e.target.value).toFixed(3));
+        });
+        this.elements.gravitySlider?.addEventListener('input', (e) => {
+            CONFIG.GRAVITY = parseFloat(e.target.value);
+            this.updateSliderDisplay('gravity', parseFloat(e.target.value).toFixed(3));
         });
         this.elements.gridSizeSlider?.addEventListener('input', (e) => {
             const newSize = parseInt(e.target.value);

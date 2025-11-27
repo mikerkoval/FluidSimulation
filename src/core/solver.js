@@ -196,6 +196,31 @@ export class FluidSolver {
         this.device.queue.submit([encoder.finish()]);
     }
 
+    applyGravity(velocityBuffer) {
+        if (CONFIG.GRAVITY === 0) return;
+
+        const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
+        const bufferIndex = (velocityBuffer === this.buffers.velocityBuffers[0]) ? 0 : 1;
+
+        const gravityUniform = new Float32Array([
+            0, 0,
+            CONFIG.GRID_SIZE, CONFIG.GRID_SIZE,
+            0, CONFIG.GRAVITY,
+            CONFIG.N, CONFIG.UPDATE_INTERVAL / 1000,
+            0, 0
+        ]);
+        this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, gravityUniform);
+
+        const encoder = this.device.createCommandEncoder();
+        const computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.gravity.program);
+        computePass.setBindGroup(0, this.bindGroups.gravity[bufferIndex]);
+        computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
+        computePass.end();
+
+        this.device.queue.submit([encoder.finish()]);
+    }
+
     updateVelocity() {
         STATE.diffuseState = CONFIG.VISCOSITY;
         const velocityBuffers = this.buffers.velocityBuffers;
@@ -241,6 +266,7 @@ export class FluidSolver {
         this.project(velocityBuffers[STATE.velocityStep % 2],
                      velocityBuffers[(STATE.velocityStep + 1) % 2]);
 
+        this.applyGravity(velocityBuffers[STATE.velocityStep % 2]);
         this.applyVorticityConfinement(velocityBuffers[STATE.velocityStep % 2]);
     }
 

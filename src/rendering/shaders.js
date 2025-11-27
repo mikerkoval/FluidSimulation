@@ -204,7 +204,9 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 // Left and right walls (i=0 and i=N+1)
                 if(i == 0 && j >= 1 && j <= N) {
                     if(u32(uniforms.b) == 1) {
-                        arr[index] = -arr[IX(1, j)];  // Reverse horizontal velocity
+                        // Reverse ONLY x component for horizontal velocity
+                        var neighbor = arr[IX(1, j)];
+                        arr[index] = vec4f(-neighbor.x, neighbor.y, neighbor.z, neighbor.w);
                     } else {
                         arr[index] = arr[IX(1, j)];   // Copy for density and v
                     }
@@ -212,7 +214,9 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 }
                 if(i == u32(N + 1) && j >= 1 && j <= N) {
                     if(u32(uniforms.b) == 1) {
-                        arr[index] = -arr[IX(N, j)];  // Reverse horizontal velocity
+                        // Reverse ONLY x component for horizontal velocity
+                        var neighbor = arr[IX(N, j)];
+                        arr[index] = vec4f(-neighbor.x, neighbor.y, neighbor.z, neighbor.w);
                     } else {
                         arr[index] = arr[IX(N, j)];   // Copy for density and v
                     }
@@ -222,7 +226,9 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 // Top and bottom walls (j=0 and j=N+1)
                 if(j == 0 && i >= 1 && i <= N) {
                     if(u32(uniforms.b) == 2) {
-                        arr[index] = -arr[IX(i, 1)];  // Reverse vertical velocity
+                        // Reverse ONLY y component for vertical velocity
+                        var neighbor = arr[IX(i, 1)];
+                        arr[index] = vec4f(neighbor.x, -neighbor.y, neighbor.z, neighbor.w);
                     } else {
                         arr[index] = arr[IX(i, 1)];   // Copy for density and u
                     }
@@ -230,7 +236,9 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 }
                 if(j == u32(N + 1) && i >= 1 && i <= N) {
                     if(u32(uniforms.b) == 2) {
-                        arr[index] = -arr[IX(i, N)];  // Reverse vertical velocity
+                        // Reverse ONLY y component for vertical velocity
+                        var neighbor = arr[IX(i, N)];
+                        arr[index] = vec4f(neighbor.x, -neighbor.y, neighbor.z, neighbor.w);
                     } else {
                         arr[index] = arr[IX(i, N)];   // Copy for density and u
                     }
@@ -449,6 +457,13 @@ export function createShaderCode(WORKGROUP_SIZE) {
         `,
 
         vorticity: `
+            struct Uniforms {
+                mouse: vec2f,
+                grid_size: vec2f,
+                diff: f32, visc: f32,
+                N: f32, dt: f32, b: f32,
+            };
+
             @group(0) @binding(0) var<uniform> uniforms: Uniforms;
             @group(0) @binding(1) var<storage, read_write> vort: array<vec4f>;
             @group(0) @binding(2) var<storage> uv: array<vec4f>;
@@ -476,6 +491,13 @@ export function createShaderCode(WORKGROUP_SIZE) {
         `,
 
         vorticityConfinement: `
+            struct Uniforms {
+                mouse: vec2f,
+                grid_size: vec2f,
+                diff: f32, visc: f32,
+                N: f32, dt: f32, b: f32,
+            };
+
             @group(0) @binding(0) var<uniform> uniforms: Uniforms;
             @group(0) @binding(1) var<storage, read_write> uv: array<vec4f>;
             @group(0) @binding(2) var<storage> vort: array<vec4f>;
@@ -502,8 +524,37 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let force_x = (dw_dy / length) * vort[idx].x;
                 let force_y = -(dw_dx / length) * vort[idx].x;
 
-                uv[idx].x += uniforms.visc * uniforms.dt * force_x * 100.0;
-                uv[idx].y += uniforms.visc * uniforms.dt * force_y * 100.0;
+                uv[idx].x += uniforms.visc * uniforms.dt * force_x;
+                uv[idx].y += uniforms.visc * uniforms.dt * force_y;
+            }
+        `,
+
+        gravity: `
+            struct Uniforms {
+                mouse: vec2f,
+                grid_size: vec2f,
+                diff: f32, visc: f32,
+                N: f32, dt: f32, b: f32,
+            };
+
+            @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+            @group(0) @binding(1) var<storage, read_write> uv: array<vec4f>;
+
+            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                let N = u32(uniforms.N);
+                let x = global_id.x + 1;
+                let y = global_id.y + 1;
+
+                if (x > N || y > N) { return; }
+
+                let grid_width = u32(uniforms.grid_size.x);
+                let idx = y * grid_width + x;
+
+                // Apply gravity force to vertical velocity (y-component)
+                // uniforms.visc contains the gravity strength
+                // Negative y is downward in this coordinate system
+                uv[idx].y -= uniforms.visc * uniforms.dt * 0.3;
             }
         `
     };
