@@ -334,7 +334,7 @@ button.reload {
 /* Hide unsupported Stam features */
 #fadeSlider, #fadeValue, #fadeToggle,
 #bloomIntensitySlider, #bloomIntensityValue,
-#bloomThresholdSlider, #bloomThresholdValue, #bloomToggle,
+#bloomThresholdSlider, #bloomThresholdValue,
 #clearObstaclesBtn, #obstacleRadiusSlider, #obstacleRadiusValue,
 #adaptiveToggle {
     display: none !important;
@@ -355,7 +355,6 @@ label:has(+ #bloomThresholdSlider),
 label:has(+ #obstacleRadiusSlider),
 #fadeToggle,
 #vorticityToggle,
-#bloomToggle,
 #clearObstaclesBtn,
 #adaptiveToggle {
     display: none !important;
@@ -367,7 +366,6 @@ label:has(+ #obstacleRadiusSlider),
 .control-group:has(#bloomThresholdSlider),
 .control-group:has(#fadeToggle),
 .control-group:has(#vorticityToggle),
-.control-group:has(#bloomToggle),
 .control-group:has(#clearObstaclesBtn),
 .control-group:has(#obstacleRadiusSlider),
 .control-group:has(#adaptiveToggle) {

@@ -631,10 +631,10 @@ export function createShaderCode(WORKGROUP_SIZE) {
 
                 // Extract bright areas (threshold)
                 let brightness = dot(color.rgb, vec3f(0.2126, 0.7152, 0.0722));
-                let threshold = 0.5;
+                let threshold = 0.1;
 
                 if (brightness > threshold) {
-                    textureStore(outputTexture, coords, color * (brightness - threshold));
+                    textureStore(outputTexture, coords, color * (brightness - threshold) * 2.0);
                 } else {
                     textureStore(outputTexture, coords, vec4f(0.0));
                 }
@@ -709,7 +709,7 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let bloom = textureLoad(bloomTexture, coords, 0);
 
                 // Add bloom with intensity
-                let bloomIntensity = 0.8;
+                let bloomIntensity = 1.5;
                 let result = original + bloom * bloomIntensity;
 
                 textureStore(outputTexture, coords, vec4f(result.rgb, 1.0));

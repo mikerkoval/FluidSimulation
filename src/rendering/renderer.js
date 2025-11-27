@@ -2,13 +2,14 @@ import { CONFIG, STATE } from '../core/config.js';
 
 export class FluidRenderer {
     
-    constructor(device, context, buffers, pipelines, bindGroups, vertexBuffer) {
+    constructor(device, context, buffers, pipelines, bindGroups, vertexBuffer, bloomTextures) {
         this.device = device;
         this.context = context;
         this.buffers = buffers;
         this.pipelines = pipelines;
         this.bindGroups = bindGroups;
         this.vertexBuffer = vertexBuffer;
+        this.bloomTextures = bloomTextures;
     }
 
     
@@ -62,7 +63,11 @@ export class FluidRenderer {
 
         pass.setPipeline(this.pipelines.drawTexture.program);
         pass.setVertexBuffer(0, this.vertexBuffer);
-        pass.setBindGroup(0, this.bindGroups.drawTexture);
+        // Use bloomed texture if bloom is enabled, otherwise use original
+        const bindGroup = (CONFIG.ENABLE_BLOOM && this.bloomTextures && this.bindGroups.drawBloomTexture)
+            ? this.bindGroups.drawBloomTexture
+            : this.bindGroups.drawTexture;
+        pass.setBindGroup(0, bindGroup);
         pass.draw(6, 1);
         pass.end();
 
@@ -140,11 +145,54 @@ export class FluidRenderer {
     }
 
     
+    applyBloom() {
+        if (!this.bloomTextures) return;
+
+        const canvas = document.querySelector("canvas");
+        const workgroupCountX = Math.ceil(canvas.width / CONFIG.WORKGROUP_SIZE);
+        const workgroupCountY = Math.ceil(canvas.height / CONFIG.WORKGROUP_SIZE);
+
+        const encoder = this.device.createCommandEncoder();
+
+        // Pass 1: Extract bright areas
+        let computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.bloomExtract.program);
+        computePass.setBindGroup(0, this.bindGroups.bloomExtract);
+        computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+        computePass.end();
+
+        // Pass 2: Blur horizontally
+        computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.bloomBlurH.program);
+        computePass.setBindGroup(0, this.bindGroups.bloomBlurH);
+        computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+        computePass.end();
+
+        // Pass 3: Blur vertically
+        computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.bloomBlurV.program);
+        computePass.setBindGroup(0, this.bindGroups.bloomBlurV);
+        computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+        computePass.end();
+
+        // Pass 4: Composite
+        computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.pipelines.bloomComposite.program);
+        computePass.setBindGroup(0, this.bindGroups.bloomComposite);
+        computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+        computePass.end();
+
+        this.device.queue.submit([encoder.finish()]);
+    }
+
     render(useTexture) {
         const buffer = this.getDrawBuffer();
 
         if (useTexture) {
             this.createTextureFromBuffer(buffer);
+            if (CONFIG.ENABLE_BLOOM) {
+                this.applyBloom();
+            }
             this.drawTexture();
         } else {
             this.drawBuffer(buffer);

@@ -27,7 +27,7 @@
                         Diffusion
                         <span class="value-display" id="diffuseValue">0.000</span>
                     </label>
-                    <input type="range" id="diffuseSlider" min="0" max="0.1" step="0.001" value="0">
+                    <input type="range" id="diffuseSlider" min="0" max="0.01" step="0.0001" value="0">
                     <p class="info-text">Controls how quickly color spreads through the fluid</p>
                 </div>
 
@@ -43,9 +43,9 @@
                 <div class="control-group">
                     <label>
                         Vorticity
-                        <span class="value-display" id="vorticityValue">0.010</span>
+                        <span class="value-display" id="vorticityValue">0.050</span>
                     </label>
-                    <input type="range" id="vorticitySlider" min="0" max="0.1" step="0.001" value="0.01">
+                    <input type="range" id="vorticitySlider" min="0" max="0.1" step="0.005" value="0.05">
                     <p class="info-text">Adds swirling turbulence to the fluid motion</p>
                 </div>
 
@@ -71,19 +71,27 @@
                 <div class="control-group">
                     <label>
                         Color Radius
-                        <span class="value-display" id="colorRadiusValue">3</span>
+                        <span class="value-display" id="colorRadiusValue">4</span>
                     </label>
-                    <input type="range" id="colorRadiusSlider" min="1" max="20" step="1" value="3">
+                    <input type="range" id="colorRadiusSlider" min="1" max="20" step="1" value="4">
                     <p class="info-text">Brush size for density injection</p>
                 </div>
 
                 <div class="control-group">
                     <label>
                         Velocity Radius
-                        <span class="value-display" id="velocityRadiusValue">2</span>
+                        <span class="value-display" id="velocityRadiusValue">3</span>
                     </label>
-                    <input type="range" id="velocityRadiusSlider" min="1" max="10" step="1" value="2">
+                    <input type="range" id="velocityRadiusSlider" min="1" max="10" step="1" value="3">
                     <p class="info-text">Brush size for velocity injection</p>
+                </div>
+                <div class="control-group">
+                    <label>
+                        Velocity Strength
+                        <span class="value-display" id="velocityStrengthValue">0.30</span>
+                    </label>
+                    <input type="range" id="velocityStrengthSlider" min="0" max="5" step="0.05" value="0.30">
+                    <p class="info-text">Force multiplier for velocity input</p>
                 </div>
                 </div>
             </div>
@@ -107,11 +115,11 @@
 
                 <div class="control-group">
                     <label>
-                        Display Resolution
-                        <span class="value-display" id="displayResolutionValue">256</span>
+                        Density Grid Size
+                        <span class="value-display" id="displayResolutionValue">128</span>
                     </label>
-                    <input type="range" id="displayResolutionSlider" min="128" max="1024" step="128" value="256">
-                    <p class="info-text">Canvas resolution (requires reload)</p>
+                    <input type="range" id="displayResolutionSlider" min="64" max="512" step="64" value="128">
+                    <p class="info-text">Dye/color resolution (requires reload)</p>
                 </div>
 
                 <div class="control-group">
@@ -126,9 +134,9 @@
                 <div class="control-group">
                     <label>
                         Solver Iterations
-                        <span class="value-display" id="solverIterationsValue">10</span>
+                        <span class="value-display" id="solverIterationsValue">5</span>
                     </label>
-                    <input type="range" id="solverIterationsSlider" min="1" max="20" step="1" value="10">
+                    <input type="range" id="solverIterationsSlider" min="1" max="20" step="1" value="5">
                     <p class="info-text">Gauss-Seidel iterations (higher = more accurate)</p>
                 </div>
 
@@ -138,6 +146,15 @@
                         <span>Enabled</span>
                         <div class="toggle-switch"></div>
                     </div>
+                </div>
+
+                <div class="control-group">
+                    <label style="margin-bottom: 10px;">Bloom Effect</label>
+                    <div class="toggle-btn active" id="bloomToggle">
+                        <span>Enabled</span>
+                        <div class="toggle-switch"></div>
+                    </div>
+                    <p class="info-text">Glow effect for bright colors</p>
                 </div>
                 </div>
             </div>
@@ -167,6 +184,7 @@
                     </div>
                     <p class="info-text">Smooth interpolated rendering vs. raw grid</p>
                 </div>
+
                 </div>
             </div>
 

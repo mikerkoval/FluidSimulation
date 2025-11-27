@@ -51,4 +51,5 @@ export function setupInputHandlers(canvas, simulation) {
         clearTimeout(timer);
         timer = setTimeout(mouseStopped, 50);
     }, false);
+
 }

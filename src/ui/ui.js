@@ -14,7 +14,11 @@ export function loadSettingsFromURL() {
     if (params.has('velocityRadius')) CONFIG.VELOCITY_RADIUS = parseInt(params.get('velocityRadius'));
     if (params.has('updateInterval')) CONFIG.UPDATE_INTERVAL = parseInt(params.get('updateInterval'));
     if (params.has('solverIterations')) CONFIG.SOLVER_ITERATIONS = parseInt(params.get('solverIterations'));
-    if (params.has('displayResolution')) CONFIG.DISPLAY_RESOLUTION = parseInt(params.get('displayResolution'));
+    if (params.has('dyeSize')) {
+        CONFIG.DYE_N = parseInt(params.get('dyeSize'));
+        CONFIG.DYE_GRID_SIZE = CONFIG.DYE_N + 2;
+        CONFIG.DISPLAY_RESOLUTION = CONFIG.DYE_N;
+    }
     STATE.diffuseState = CONFIG.DIFFUSE;
 }
 
@@ -31,11 +35,11 @@ export class UIController {
         params.set('viscosity', CONFIG.VISCOSITY);
         params.set('vorticity', CONFIG.VORTICITY);
         params.set('gridSize', CONFIG.N);
+        params.set('dyeSize', CONFIG.DYE_N);
         params.set('colorRadius', CONFIG.COLOR_RADIUS);
         params.set('velocityRadius', CONFIG.VELOCITY_RADIUS);
         params.set('updateInterval', CONFIG.UPDATE_INTERVAL);
         params.set('solverIterations', CONFIG.SOLVER_ITERATIONS);
-        params.set('displayResolution', CONFIG.DISPLAY_RESOLUTION);
         return params.toString();
     }
 
@@ -55,6 +59,8 @@ export class UIController {
             colorRadiusValue: document.getElementById('colorRadiusValue'),
             velocityRadiusSlider: document.getElementById('velocityRadiusSlider'),
             velocityRadiusValue: document.getElementById('velocityRadiusValue'),
+            velocityStrengthSlider: document.getElementById('velocityStrengthSlider'),
+            velocityStrengthValue: document.getElementById('velocityStrengthValue'),
             updateIntervalSlider: document.getElementById('updateIntervalSlider'),
             updateIntervalValue: document.getElementById('updateIntervalValue'),
             drawModeToggle: document.getElementById('drawModeToggle'),
@@ -70,7 +76,8 @@ export class UIController {
             displayResolutionSlider: document.getElementById('displayResolutionSlider'),
             displayResolutionValue: document.getElementById('displayResolutionValue'),
             fpsToggle: document.getElementById('fpsToggle'),
-            fpsCounter: document.getElementById('fpsCounter')
+            fpsCounter: document.getElementById('fpsCounter'),
+            bloomToggle: document.getElementById('bloomToggle')
         };
         if (this.elements.diffuseSlider) this.elements.diffuseSlider.value = CONFIG.DIFFUSE;
         if (this.elements.viscositySlider) this.elements.viscositySlider.value = CONFIG.VISCOSITY;
@@ -79,9 +86,10 @@ export class UIController {
         if (this.elements.gridSizeSlider) this.elements.gridSizeSlider.value = CONFIG.N;
         if (this.elements.colorRadiusSlider) this.elements.colorRadiusSlider.value = CONFIG.COLOR_RADIUS;
         if (this.elements.velocityRadiusSlider) this.elements.velocityRadiusSlider.value = CONFIG.VELOCITY_RADIUS;
+        if (this.elements.velocityStrengthSlider) this.elements.velocityStrengthSlider.value = CONFIG.VELOCITY_FORCE_MULTIPLIER;
         if (this.elements.updateIntervalSlider) this.elements.updateIntervalSlider.value = CONFIG.UPDATE_INTERVAL;
         if (this.elements.solverIterationsSlider) this.elements.solverIterationsSlider.value = CONFIG.SOLVER_ITERATIONS;
-        if (this.elements.displayResolutionSlider) this.elements.displayResolutionSlider.value = CONFIG.DISPLAY_RESOLUTION;
+        if (this.elements.displayResolutionSlider) this.elements.displayResolutionSlider.value = CONFIG.DYE_N;
         if (CONFIG.SHOW_FPS) {
             STATE.frameCount = 0;
             STATE.lastFpsTime = performance.now();
@@ -109,9 +117,10 @@ export class UIController {
         this.updateSliderDisplay('gridSize', CONFIG.N);
         this.updateSliderDisplay('colorRadius', CONFIG.COLOR_RADIUS);
         this.updateSliderDisplay('velocityRadius', CONFIG.VELOCITY_RADIUS);
+        this.updateSliderDisplay('velocityStrength', CONFIG.VELOCITY_FORCE_MULTIPLIER.toFixed(2));
         this.updateSliderDisplay('updateInterval', CONFIG.UPDATE_INTERVAL, 'ms');
         this.updateSliderDisplay('solverIterations', CONFIG.SOLVER_ITERATIONS);
-        this.updateSliderDisplay('displayResolution', CONFIG.DISPLAY_RESOLUTION);
+        this.updateSliderDisplay('displayResolution', CONFIG.DYE_N);
     }
 
     updateSliderDisplay(name, value, suffix = '') {
@@ -151,6 +160,10 @@ export class UIController {
             CONFIG.VELOCITY_RADIUS = parseInt(e.target.value);
             this.updateSliderDisplay('velocityRadius', e.target.value);
         });
+        this.elements.velocityStrengthSlider?.addEventListener('input', (e) => {
+            CONFIG.VELOCITY_FORCE_MULTIPLIER = parseFloat(e.target.value);
+            this.updateSliderDisplay('velocityStrength', parseFloat(e.target.value).toFixed(2));
+        });
         this.elements.updateIntervalSlider?.addEventListener('input', (e) => {
             CONFIG.UPDATE_INTERVAL = parseInt(e.target.value);
             this.updateSliderDisplay('updateInterval', e.target.value, 'ms');
@@ -186,8 +199,8 @@ export class UIController {
             this.updateSliderDisplay('solverIterations', e.target.value);
         });
         this.elements.displayResolutionSlider?.addEventListener('input', (e) => {
-            CONFIG.DISPLAY_RESOLUTION = parseInt(e.target.value);
-            this.updateSliderDisplay('displayResolution', e.target.value);
+            const newSize = parseInt(e.target.value);
+            this.updateSliderDisplay('displayResolution', newSize);
         });
         this.elements.fpsToggle?.addEventListener('click', () => {
             CONFIG.SHOW_FPS = !CONFIG.SHOW_FPS;
@@ -202,6 +215,12 @@ export class UIController {
                 STATE.lastFpsTime = performance.now();
             }
         });
+        this.elements.bloomToggle?.addEventListener('click', () => {
+            CONFIG.ENABLE_BLOOM = !CONFIG.ENABLE_BLOOM;
+            this.elements.bloomToggle.classList.toggle('active');
+            const span = this.elements.bloomToggle.querySelector('span');
+            if (span) span.textContent = CONFIG.ENABLE_BLOOM ? 'Enabled' : 'Disabled';
+        });
     }
 
     reloadSimulation() {
@@ -209,6 +228,12 @@ export class UIController {
         if (newGridSize !== CONFIG.N) {
             CONFIG.N = newGridSize;
             CONFIG.GRID_SIZE = newGridSize + 2;
+        }
+        const newDyeSize = parseInt(this.elements.displayResolutionSlider?.value || CONFIG.DYE_N);
+        if (newDyeSize !== CONFIG.DYE_N) {
+            CONFIG.DYE_N = newDyeSize;
+            CONFIG.DYE_GRID_SIZE = newDyeSize + 2;
+            CONFIG.DISPLAY_RESOLUTION = newDyeSize;  // Keep canvas size matched to dye size
         }
         const settingsQuery = this.saveSettingsToURL();
         const newURL = window.location.origin + window.location.pathname + '?' + settingsQuery;
