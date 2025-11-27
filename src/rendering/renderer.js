@@ -14,10 +14,24 @@ export class FluidRenderer {
     
     createTextureFromBuffer(buffer) {
         let bindGroupIndex;
+        const isDensity = (buffer === this.buffers.densityBuffers[0] || buffer === this.buffers.densityBuffers[1]);
+
         if (buffer === this.buffers.densityBuffers[0]) bindGroupIndex = 0;
         else if (buffer === this.buffers.densityBuffers[1]) bindGroupIndex = 1;
         else if (buffer === this.buffers.velocityBuffers[0]) bindGroupIndex = 2;
         else bindGroupIndex = 3; // velocityBuffers[1]
+
+        // Set uniforms with appropriate N value for the buffer type
+        const N = isDensity ? CONFIG.DYE_N : CONFIG.N;
+        const GRID_SIZE = isDensity ? CONFIG.DYE_GRID_SIZE : CONFIG.GRID_SIZE;
+        const uniformArray = new Float32Array([
+            0, 0,  // mouse (not used in rendering)
+            GRID_SIZE, GRID_SIZE,
+            0, 0,  // diff, visc (not used in rendering)
+            N, 0,  // N, dt
+            0, 0   // b, padding
+        ]);
+        this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, uniformArray);
 
         const encoder = this.device.createCommandEncoder();
         const computePass = encoder.beginComputePass();
@@ -58,10 +72,24 @@ export class FluidRenderer {
     
     drawBuffer(buffer) {
         let bindGroupIndex;
+        const isDensity = (buffer === this.buffers.densityBuffers[0] || buffer === this.buffers.densityBuffers[1]);
+
         if (buffer === this.buffers.densityBuffers[0]) bindGroupIndex = 0;
         else if (buffer === this.buffers.densityBuffers[1]) bindGroupIndex = 1;
         else if (buffer === this.buffers.velocityBuffers[0]) bindGroupIndex = 2;
         else bindGroupIndex = 3; // velocityBuffers[1]
+
+        // Set uniforms with appropriate N value for the buffer type
+        const N = isDensity ? CONFIG.DYE_N : CONFIG.N;
+        const GRID_SIZE = isDensity ? CONFIG.DYE_GRID_SIZE : CONFIG.GRID_SIZE;
+        const uniformArray = new Float32Array([
+            0, 0,  // mouse (not used in rendering)
+            GRID_SIZE, GRID_SIZE,
+            0, 0,  // diff, visc (not used in rendering)
+            N, 0,  // N, dt
+            0, 0   // b, padding
+        ]);
+        this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, uniformArray);
 
         const encoder = this.device.createCommandEncoder();
         const pass = encoder.beginRenderPass({

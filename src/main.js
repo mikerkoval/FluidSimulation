@@ -21,8 +21,8 @@ async function main() {
 
         const { device, canvasFormat, context } = await initGPU();
         const { vertexBuffer, vertexBufferLayout } = createVertexBuffer(device);
-        const buffers = createBuffers(device, CONFIG.GRID_SIZE);
-        const { texture, sampler } = createTexture(device, CONFIG.N);
+        const buffers = createBuffers(device, CONFIG.GRID_SIZE, CONFIG.DYE_GRID_SIZE);
+        const { texture, sampler } = createTexture(device, CONFIG.DYE_N);
         const pipelines = createPipelines(device, canvasFormat, vertexBufferLayout);
         const simulation = new FluidSimulation(device, context, buffers, pipelines, vertexBuffer, texture, sampler);
 

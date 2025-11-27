@@ -166,10 +166,13 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 var index = (global_id.x + 1) + u32(uniforms.grid_size.x) * (global_id.y + 1);
                 stateOut[index] = stateIn[index];
 
-                // Stam's add_source: just add if within radius
-                if(length(vec2f(uniforms.mouse) - vec2f((vec2f(global_id.xy) + vec2f(1)))) < source.radius) {
-                    stateOut[index] += source.color;
-                }
+                // Gaussian splat: smooth falloff based on distance
+                let dist = length(vec2f(uniforms.mouse) - vec2f((vec2f(global_id.xy) + vec2f(1))));
+                let sigma = source.radius * 0.5; // Control spread
+                let gaussian = exp(-(dist * dist) / (2.0 * sigma * sigma));
+
+                // Apply Gaussian-weighted color addition
+                stateOut[index] += source.color * gaussian;
             }
         `,
 
@@ -325,12 +328,48 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let j = f32(global_id.y + 1);
                 let idx = u32(j) * grid_width + u32(i);
 
+                // Sample velocity - map current position to velocity grid
+                // For density (high res) advecting with velocity (low res), scale coordinates
+                // uniforms.diffuse is repurposed to hold velocity N when needed
+                let vel_N = uniforms.diffuse;
+                let use_scaled_vel = (vel_N > 0.0 && vel_N != uniforms.N);
+
+                var velocity: vec4f;
+                if (use_scaled_vel) {
+                    // Map from density grid [1, dye_N] to velocity grid [1, vel_N]
+                    // Normalize position within grid (0 to 1), then map to velocity grid
+                    let i_normalized = (i - 1.0) / (uniforms.N - 1.0);
+                    let j_normalized = (j - 1.0) / (uniforms.N - 1.0);
+                    let i_vel = 1.0 + i_normalized * (vel_N - 1.0);
+                    let j_vel = 1.0 + j_normalized * (vel_N - 1.0);
+
+                    // Bilinear sample from velocity grid
+                    let vel_grid_width = u32(vel_N + 2.0);
+                    let i0 = u32(floor(i_vel));
+                    let j0 = u32(floor(j_vel));
+                    let i1 = min(i0 + 1, u32(vel_N + 1.0));
+                    let j1 = min(j0 + 1, u32(vel_N + 1.0));
+
+                    let tx = i_vel - f32(i0);
+                    let ty = j_vel - f32(j0);
+
+                    let v00 = uv[j0 * vel_grid_width + i0];
+                    let v10 = uv[j0 * vel_grid_width + i1];
+                    let v01 = uv[j1 * vel_grid_width + i0];
+                    let v11 = uv[j1 * vel_grid_width + i1];
+
+                    velocity = mix(mix(v00, v10, tx), mix(v01, v11, tx), ty);
+                } else {
+                    // Same resolution - direct lookup
+                    velocity = uv[idx];
+                }
+
                 // dt0 = dt * N
                 let dt0 = uniforms.dt * uniforms.N;
 
                 // Backtrace: find where this particle came from
-                var x = i - dt0 * uv[idx].x;
-                var y = j - dt0 * uv[idx].y;
+                var x = i - dt0 * velocity.x;
+                var y = j - dt0 * velocity.y;
 
                 // Clamp to grid bounds
                 if (x < 0.5) { x = 0.5; }
@@ -350,8 +389,16 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let t0 = 1.0 - t1;
 
                 // Stam's formula: d[i,j] = s0*(t0*d0[i0,j0]+t1*d0[i0,j1]) + s1*(t0*d0[i1,j0]+t1*d0[i1,j1])
-                d[idx] = s0 * (t0 * d0[j0 * grid_width + i0] + t1 * d0[j1 * grid_width + i0]) +
-                         s1 * (t0 * d0[j0 * grid_width + i1] + t1 * d0[j1 * grid_width + i1]);
+                var result = s0 * (t0 * d0[j0 * grid_width + i0] + t1 * d0[j1 * grid_width + i0]) +
+                             s1 * (t0 * d0[j0 * grid_width + i1] + t1 * d0[j1 * grid_width + i1]);
+
+                // Apply decay to density (b=0), but not velocity (b=1)
+                // Use viscosity field to pass density decay value
+                if (uniforms.b == 0.0) {
+                    result *= uniforms.viscosity;
+                }
+
+                d[idx] = result;
             }
         `,
 
@@ -566,6 +613,106 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 // uniforms.visc contains the gravity strength
                 // Negative y is downward in this coordinate system
                 uv[idx].y -= uniforms.visc * uniforms.dt * 0.3;
+            }
+        `,
+
+        // Bloom pass 1: Extract bright colors
+        bloomExtract: `
+            @group(0) @binding(0) var inputTexture: texture_2d<f32>;
+            @group(0) @binding(1) var outputTexture: texture_storage_2d<rgba16float, write>;
+
+            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                let dims = textureDimensions(inputTexture);
+                if (global_id.x >= dims.x || global_id.y >= dims.y) { return; }
+
+                let coords = vec2i(global_id.xy);
+                let color = textureLoad(inputTexture, coords, 0);
+
+                // Extract bright areas (threshold)
+                let brightness = dot(color.rgb, vec3f(0.2126, 0.7152, 0.0722));
+                let threshold = 0.5;
+
+                if (brightness > threshold) {
+                    textureStore(outputTexture, coords, color * (brightness - threshold));
+                } else {
+                    textureStore(outputTexture, coords, vec4f(0.0));
+                }
+            }
+        `,
+
+        // Bloom pass 2: Horizontal blur
+        bloomBlurH: `
+            @group(0) @binding(0) var inputTexture: texture_2d<f32>;
+            @group(0) @binding(1) var outputTexture: texture_storage_2d<rgba16float, write>;
+
+            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                let dims = textureDimensions(inputTexture);
+                if (global_id.x >= dims.x || global_id.y >= dims.y) { return; }
+
+                let coords = vec2i(global_id.xy);
+
+                // 5-tap Gaussian blur horizontally
+                let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+                var result = textureLoad(inputTexture, coords, 0) * weights[0];
+
+                for (var i: i32 = 1; i < 5; i++) {
+                    let offset = vec2i(i, 0);
+                    result += textureLoad(inputTexture, coords + offset, 0) * weights[i];
+                    result += textureLoad(inputTexture, coords - offset, 0) * weights[i];
+                }
+
+                textureStore(outputTexture, coords, result);
+            }
+        `,
+
+        // Bloom pass 3: Vertical blur
+        bloomBlurV: `
+            @group(0) @binding(0) var inputTexture: texture_2d<f32>;
+            @group(0) @binding(1) var outputTexture: texture_storage_2d<rgba16float, write>;
+
+            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                let dims = textureDimensions(inputTexture);
+                if (global_id.x >= dims.x || global_id.y >= dims.y) { return; }
+
+                let coords = vec2i(global_id.xy);
+
+                // 5-tap Gaussian blur vertically
+                let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+                var result = textureLoad(inputTexture, coords, 0) * weights[0];
+
+                for (var i: i32 = 1; i < 5; i++) {
+                    let offset = vec2i(0, i);
+                    result += textureLoad(inputTexture, coords + offset, 0) * weights[i];
+                    result += textureLoad(inputTexture, coords - offset, 0) * weights[i];
+                }
+
+                textureStore(outputTexture, coords, result);
+            }
+        `,
+
+        // Bloom pass 4: Composite (add bloom to original)
+        bloomComposite: `
+            @group(0) @binding(0) var originalTexture: texture_2d<f32>;
+            @group(0) @binding(1) var bloomTexture: texture_2d<f32>;
+            @group(0) @binding(2) var outputTexture: texture_storage_2d<rgba8unorm, write>;
+
+            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
+            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
+                let dims = textureDimensions(originalTexture);
+                if (global_id.x >= dims.x || global_id.y >= dims.y) { return; }
+
+                let coords = vec2i(global_id.xy);
+                let original = textureLoad(originalTexture, coords, 0);
+                let bloom = textureLoad(bloomTexture, coords, 0);
+
+                // Add bloom with intensity
+                let bloomIntensity = 0.8;
+                let result = original + bloom * bloomIntensity;
+
+                textureStore(outputTexture, coords, vec4f(result.rgb, 1.0));
             }
         `
     };

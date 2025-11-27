@@ -4,7 +4,7 @@ import { FluidRenderer } from '../rendering/renderer.js';
 import { createBindGroups } from '../gpu/bindGroups.js';
 
 export class FluidSimulation {
-    
+
     constructor(device, context, buffers, pipelines, vertexBuffer, texture, sampler) {
         this.device = device;
         this.context = context;
@@ -15,12 +15,12 @@ export class FluidSimulation {
         this.renderer = new FluidRenderer(device, context, buffers, pipelines, this.bindGroups, vertexBuffer);
     }
 
-    
+
     clear() {
         this.solver.clear();
     }
 
-    
+
     run() {
         this.solver.setUniforms(0);
 

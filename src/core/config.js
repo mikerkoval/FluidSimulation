@@ -4,11 +4,14 @@ export const CONFIG = {
     VORTICITY: 0.01,
     GRAVITY: 0,
     VELOCITY_DECAY: 1.0,
-    N: 64,
+    DENSITY_DECAY: 0.99,  // Fade of colors over time
+    N: 64,  // Velocity simulation resolution
     GRID_SIZE: 66,  // N + 2 for boundary
+    DYE_N: 256,  // Dye resolution (higher for smoother visuals)
+    DYE_GRID_SIZE: 258,  // DYE_N + 2 for boundary
     COLOR_RADIUS: 2,
     VELOCITY_RADIUS: 2,
-    VELOCITY_FORCE_MULTIPLIER: 0.5,
+    VELOCITY_FORCE_MULTIPLIER: 0.15,
     WORKGROUP_SIZE: 16,
     UPDATE_INTERVAL: 16,  // ~60fps
     DRAW_DENSITY: 1,

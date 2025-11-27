@@ -50,7 +50,7 @@ export function createVertexBuffer(device) {
     return { vertices, vertexBuffer, vertexBufferLayout };
 }
 
-export function createBuffers(device, GRID_SIZE) {
+export function createBuffers(device, GRID_SIZE, DYE_GRID_SIZE) {
     const buffers = {};
     const uniformBufferSize =
         2 * 4 + // mouse
@@ -77,43 +77,48 @@ export function createBuffers(device, GRID_SIZE) {
         size: uniformColorSize,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    const stateArray = new Float32Array(4 * GRID_SIZE * GRID_SIZE);
-    // stateArray is already filled with zeros by default
 
-    buffers.densityBuffers = [
-        device.createBuffer({
-            label: "Density State A",
-            size: stateArray.byteLength,
-            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-        }),
-        device.createBuffer({
-            label: "Density State B",
-            size: stateArray.byteLength,
-            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-        })
-    ];
+    // Velocity buffers at simulation resolution
+    const velocityArray = new Float32Array(4 * GRID_SIZE * GRID_SIZE);
     buffers.velocityBuffers = [
         device.createBuffer({
             label: "Velocity State A",
-            size: stateArray.byteLength,
+            size: velocityArray.byteLength,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         }),
         device.createBuffer({
             label: "Velocity State B",
-            size: stateArray.byteLength,
+            size: velocityArray.byteLength,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         })
     ];
+
+    // Density buffers at higher dye resolution
+    const dyeArray = new Float32Array(4 * DYE_GRID_SIZE * DYE_GRID_SIZE);
+    buffers.densityBuffers = [
+        device.createBuffer({
+            label: "Density State A (High Res)",
+            size: dyeArray.byteLength,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        }),
+        device.createBuffer({
+            label: "Density State B (High Res)",
+            size: dyeArray.byteLength,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        })
+    ];
+
     buffers.vorticityBuffer = device.createBuffer({
         label: "Vorticity Buffer",
-        size: stateArray.byteLength,
+        size: velocityArray.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
-    device.queue.writeBuffer(buffers.densityBuffers[0], 0, stateArray);
-    device.queue.writeBuffer(buffers.densityBuffers[1], 0, stateArray);
-    device.queue.writeBuffer(buffers.velocityBuffers[0], 0, stateArray);
-    device.queue.writeBuffer(buffers.vorticityBuffer, 0, stateArray);
-    device.queue.writeBuffer(buffers.velocityBuffers[1], 0, stateArray);
+
+    device.queue.writeBuffer(buffers.densityBuffers[0], 0, dyeArray);
+    device.queue.writeBuffer(buffers.densityBuffers[1], 0, dyeArray);
+    device.queue.writeBuffer(buffers.velocityBuffers[0], 0, velocityArray);
+    device.queue.writeBuffer(buffers.velocityBuffers[1], 0, velocityArray);
+    device.queue.writeBuffer(buffers.vorticityBuffer, 0, velocityArray);
 
     return buffers;
 }
