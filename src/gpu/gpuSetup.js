@@ -141,3 +141,38 @@ export function createTexture(device, N) {
     return { texture, sampler };
 }
 
+export function createBloomTextures(device) {
+    const canvas = document.querySelector("canvas");
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Texture for extracting bright areas
+    const brightTexture = device.createTexture({
+        size: { width, height },
+        format: 'rgba16float',
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    // Ping-pong textures for blur passes
+    const blurTexture1 = device.createTexture({
+        size: { width, height },
+        format: 'rgba16float',
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    const blurTexture2 = device.createTexture({
+        size: { width, height },
+        format: 'rgba16float',
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    // Final composited output
+    const bloomOutputTexture = device.createTexture({
+        size: { width, height },
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    return { brightTexture, blurTexture1, blurTexture2, bloomOutputTexture };
+}
+

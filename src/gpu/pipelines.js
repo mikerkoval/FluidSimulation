@@ -279,5 +279,90 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
         })
     };
 
+    // Bloom Extract Pipeline
+    const bloomExtractModule = device.createShaderModule({
+        label: "bloom extract shader",
+        code: shaders.bloomExtract
+    });
+
+    const bloomExtractLayout = device.createBindGroupLayout({
+        label: "Bloom Extract Bind Group Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: "float" } },
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, storageTexture: { format: "rgba16float" } }
+        ]
+    });
+
+    pipelines.bloomExtract = {
+        layout: bloomExtractLayout,
+        program: device.createComputePipeline({
+            label: "bloom extract pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [bloomExtractLayout] }),
+            compute: { module: bloomExtractModule, entryPoint: "computeMain" }
+        })
+    };
+
+    // Bloom Blur Horizontal Pipeline
+    const bloomBlurHModule = device.createShaderModule({
+        label: "bloom blur H shader",
+        code: shaders.bloomBlurH
+    });
+
+    const bloomBlurLayout = device.createBindGroupLayout({
+        label: "Bloom Blur Bind Group Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: "float" } },
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, storageTexture: { format: "rgba16float" } }
+        ]
+    });
+
+    pipelines.bloomBlurH = {
+        layout: bloomBlurLayout,
+        program: device.createComputePipeline({
+            label: "bloom blur H pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [bloomBlurLayout] }),
+            compute: { module: bloomBlurHModule, entryPoint: "computeMain" }
+        })
+    };
+
+    // Bloom Blur Vertical Pipeline
+    const bloomBlurVModule = device.createShaderModule({
+        label: "bloom blur V shader",
+        code: shaders.bloomBlurV
+    });
+
+    pipelines.bloomBlurV = {
+        layout: bloomBlurLayout,
+        program: device.createComputePipeline({
+            label: "bloom blur V pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [bloomBlurLayout] }),
+            compute: { module: bloomBlurVModule, entryPoint: "computeMain" }
+        })
+    };
+
+    // Bloom Composite Pipeline
+    const bloomCompositeModule = device.createShaderModule({
+        label: "bloom composite shader",
+        code: shaders.bloomComposite
+    });
+
+    const bloomCompositeLayout = device.createBindGroupLayout({
+        label: "Bloom Composite Bind Group Layout",
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: "float" } },
+            { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: "float" } },
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, storageTexture: { format: "rgba8unorm" } }
+        ]
+    });
+
+    pipelines.bloomComposite = {
+        layout: bloomCompositeLayout,
+        program: device.createComputePipeline({
+            label: "bloom composite pipeline",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [bloomCompositeLayout] }),
+            compute: { module: bloomCompositeModule, entryPoint: "computeMain" }
+        })
+    };
+
     return pipelines;
 }
