@@ -3,7 +3,7 @@ export const CONFIG = {
     VISCOSITY: 0,
     VORTICITY: 0.01,
     GRAVITY: 0,
-    VELOCITY_DECAY: 0.999,
+    VELOCITY_DECAY: 1.0,
     N: 64,
     GRID_SIZE: 66,  // N + 2 for boundary
     COLOR_RADIUS: 2,
