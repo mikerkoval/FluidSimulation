@@ -1,7 +1,7 @@
 export const CONFIG = {
     DIFFUSE: 0.0,
     VISCOSITY: 0,
-    VORTICITY: 0.5,
+    VORTICITY: 0.01,
     GRAVITY: 0,
     VELOCITY_DECAY: 0.999,
     N: 64,

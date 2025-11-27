@@ -199,48 +199,53 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 if(f32(i) >= uniforms.grid_size.x) { return; }
                 if(f32(j) >= uniforms.grid_size.y) { return; }
 
-                // Stam's set_bnd: b=0 for density, b=1 for u (horizontal vel), b=2 for v (vertical vel)
+                // Free-slip boundaries: b=0 for density, b=1 for u (horizontal vel), b=2 for v (vertical vel)
+                // Free-slip allows tangential flow along walls, only reflects normal component
 
                 // Left and right walls (i=0 and i=N+1)
                 if(i == 0 && j >= 1 && j <= N) {
+                    var neighbor = arr[IX(1, j)];
                     if(u32(uniforms.b) == 1) {
-                        // Reverse ONLY x component for horizontal velocity
-                        var neighbor = arr[IX(1, j)];
+                        // Reflect x component (perpendicular to wall), copy y component (parallel to wall)
                         arr[index] = vec4f(-neighbor.x, neighbor.y, neighbor.z, neighbor.w);
                     } else {
-                        arr[index] = arr[IX(1, j)];   // Copy for density and v
+                        // For density and y-velocity, just copy
+                        arr[index] = neighbor;
                     }
                     return;
                 }
                 if(i == u32(N + 1) && j >= 1 && j <= N) {
+                    var neighbor = arr[IX(N, j)];
                     if(u32(uniforms.b) == 1) {
-                        // Reverse ONLY x component for horizontal velocity
-                        var neighbor = arr[IX(N, j)];
+                        // Reflect x component (perpendicular to wall), copy y component (parallel to wall)
                         arr[index] = vec4f(-neighbor.x, neighbor.y, neighbor.z, neighbor.w);
                     } else {
-                        arr[index] = arr[IX(N, j)];   // Copy for density and v
+                        // For density and y-velocity, just copy
+                        arr[index] = neighbor;
                     }
                     return;
                 }
 
                 // Top and bottom walls (j=0 and j=N+1)
                 if(j == 0 && i >= 1 && i <= N) {
+                    var neighbor = arr[IX(i, 1)];
                     if(u32(uniforms.b) == 2) {
-                        // Reverse ONLY y component for vertical velocity
-                        var neighbor = arr[IX(i, 1)];
+                        // Reflect y component (perpendicular to wall), copy x component (parallel to wall)
                         arr[index] = vec4f(neighbor.x, -neighbor.y, neighbor.z, neighbor.w);
                     } else {
-                        arr[index] = arr[IX(i, 1)];   // Copy for density and u
+                        // For density and x-velocity, just copy
+                        arr[index] = neighbor;
                     }
                     return;
                 }
                 if(j == u32(N + 1) && i >= 1 && i <= N) {
+                    var neighbor = arr[IX(i, N)];
                     if(u32(uniforms.b) == 2) {
-                        // Reverse ONLY y component for vertical velocity
-                        var neighbor = arr[IX(i, N)];
+                        // Reflect y component (perpendicular to wall), copy x component (parallel to wall)
                         arr[index] = vec4f(neighbor.x, -neighbor.y, neighbor.z, neighbor.w);
                     } else {
-                        arr[index] = arr[IX(i, N)];   // Copy for density and u
+                        // For density and x-velocity, just copy
+                        arr[index] = neighbor;
                     }
                     return;
                 }
@@ -483,10 +488,13 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let idx_bottom = idx - grid_width;
                 let idx_top = idx + grid_width;
 
-                let du_dy = (uv[idx_top].x - uv[idx_bottom].x) * 0.5;
-                let dv_dx = (uv[idx_right].y - uv[idx_left].y) * 0.5;
+                // Vorticity = curl of velocity field = dv/dx - du/dy
+                // Central difference: (f(x+h) - f(x-h)) / (2h), where h = 1/N
+                let h = 1.0 / uniforms.N;
+                let du_dy = (uv[idx_top].x - uv[idx_bottom].x) / (2.0 * h);
+                let dv_dx = (uv[idx_right].y - uv[idx_left].y) / (2.0 * h);
 
-                vort[idx].x = du_dy - dv_dx;
+                vort[idx].x = dv_dx - du_dy;
             }
         `,
 
@@ -517,13 +525,16 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let idx_bottom = idx - grid_width;
                 let idx_top = idx + grid_width;
 
-                let dw_dx = (abs(vort[idx_right].x) - abs(vort[idx_left].x)) * 0.5;
-                let dw_dy = (abs(vort[idx_top].x) - abs(vort[idx_bottom].x)) * 0.5;
+                // Gradient of vorticity magnitude: ∇|ω|
+                let h = 1.0 / uniforms.N;
+                let dw_dx = (abs(vort[idx_right].x) - abs(vort[idx_left].x)) / (2.0 * h);
+                let dw_dy = (abs(vort[idx_top].x) - abs(vort[idx_bottom].x)) / (2.0 * h);
 
                 let length = sqrt(dw_dx * dw_dx + dw_dy * dw_dy) + 0.000001;
                 let force_x = (dw_dy / length) * vort[idx].x;
                 let force_y = -(dw_dx / length) * vort[idx].x;
 
+                // Apply vorticity confinement force
                 uv[idx].x += uniforms.visc * uniforms.dt * force_x;
                 uv[idx].y += uniforms.visc * uniforms.dt * force_y;
             }
