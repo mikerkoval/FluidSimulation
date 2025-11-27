@@ -1,5 +1,5 @@
 import { CONFIG } from './core/config.js';
-import { initGPU, createVertexBuffer, createBuffers, createTexture } from './gpu/gpuSetup.js';
+import { initGPU, createVertexBuffer, createBuffers, createTexture, createBloomTextures } from './gpu/gpuSetup.js';
 import { createPipelines } from './gpu/pipelines.js';
 import { FluidSimulation } from './core/FluidSimulation.js';
 import { setupInputHandlers } from './ui/input.js';
@@ -23,8 +23,9 @@ async function main() {
         const { vertexBuffer, vertexBufferLayout } = createVertexBuffer(device);
         const buffers = createBuffers(device, CONFIG.GRID_SIZE, CONFIG.DYE_GRID_SIZE);
         const { texture, sampler } = createTexture(device, CONFIG.DYE_N);
+        const bloomTextures = createBloomTextures(device);
         const pipelines = createPipelines(device, canvasFormat, vertexBufferLayout);
-        const simulation = new FluidSimulation(device, context, buffers, pipelines, vertexBuffer, texture, sampler);
+        const simulation = new FluidSimulation(device, context, buffers, pipelines, vertexBuffer, texture, sampler, bloomTextures);
 
         setupInputHandlers(canvas, simulation);
         initializeUI();

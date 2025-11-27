@@ -1,4 +1,4 @@
-export function createBindGroups(device, buffers, pipelines, texture, sampler) {
+export function createBindGroups(device, buffers, pipelines, texture, sampler, bloomTextures) {
     const bindGroups = {};
     bindGroups.addDensity = [
         device.createBindGroup({
@@ -389,6 +389,61 @@ export function createBindGroups(device, buffers, pipelines, texture, sampler) {
             ]
         })
     ];
+
+    // Bloom bind groups
+    if (bloomTextures) {
+        // Extract bright areas from main texture
+        bindGroups.bloomExtract = device.createBindGroup({
+            label: "Bloom Extract",
+            layout: pipelines.bloomExtract.layout,
+            entries: [
+                { binding: 0, resource: texture.createView() },
+                { binding: 1, resource: bloomTextures.brightTexture.createView() }
+            ]
+        });
+
+        // Blur horizontal: bright -> blur1
+        bindGroups.bloomBlurH = device.createBindGroup({
+            label: "Bloom Blur H",
+            layout: pipelines.bloomBlurH.layout,
+            entries: [
+                { binding: 0, resource: bloomTextures.brightTexture.createView() },
+                { binding: 1, resource: bloomTextures.blurTexture1.createView() }
+            ]
+        });
+
+        // Blur vertical: blur1 -> blur2
+        bindGroups.bloomBlurV = device.createBindGroup({
+            label: "Bloom Blur V",
+            layout: pipelines.bloomBlurV.layout,
+            entries: [
+                { binding: 0, resource: bloomTextures.blurTexture1.createView() },
+                { binding: 1, resource: bloomTextures.blurTexture2.createView() }
+            ]
+        });
+
+        // Composite: original + blurred -> output
+        bindGroups.bloomComposite = device.createBindGroup({
+            label: "Bloom Composite",
+            layout: pipelines.bloomComposite.layout,
+            entries: [
+                { binding: 0, resource: texture.createView() },
+                { binding: 1, resource: bloomTextures.blurTexture2.createView() },
+                { binding: 2, resource: bloomTextures.bloomOutputTexture.createView() }
+            ]
+        });
+
+        // Bind group for drawing the bloomed texture
+        bindGroups.drawBloomTexture = device.createBindGroup({
+            label: "Draw Bloom Texture",
+            layout: pipelines.drawTexture.layout,
+            entries: [
+                { binding: 0, resource: { buffer: buffers.uniformBuffer } },
+                { binding: 1, resource: bloomTextures.bloomOutputTexture.createView() },
+                { binding: 2, resource: sampler }
+            ]
+        });
+    }
 
     return bindGroups;
 }
