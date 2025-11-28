@@ -33,7 +33,6 @@ export class FluidSolver {
 
     // Stam's add_source
     addSource(outputBuffer, inputBuffer, sourceBuffer, N = CONFIG.N, GRID_SIZE = CONFIG.GRID_SIZE) {
-        // Set uniforms with correct N and GRID_SIZE
         this.setUniforms(0, N, GRID_SIZE);
 
         let bindGroup;
@@ -58,7 +57,6 @@ export class FluidSolver {
 
     // Stam's set_bnd
     setBoundary(encoder, b, buffer, N = CONFIG.N, GRID_SIZE = CONFIG.GRID_SIZE, velN = null, decayValue = null) {
-        // If velN is provided, we need to preserve it in uniforms (for advect with different resolutions)
         if (velN !== null) {
             const mouseX = (STATE.mousePosition.x / this.width) * N + 1;
             const mouseY = ((this.height - STATE.mousePosition.y) / this.height) * N + 1;
@@ -93,8 +91,6 @@ export class FluidSolver {
     // Stam's diffuse (Gauss-Seidel relaxation)
     diffuse(b, outputBuffer, inputBuffer, diffusion, N = CONFIG.N, GRID_SIZE = CONFIG.GRID_SIZE) {
         const iterations = CONFIG.SOLVER_ITERATIONS;
-
-        // Set uniforms with diffusion parameter
         const mouseX = (STATE.mousePosition.x / this.width) * N + 1;
         const mouseY = ((this.height - STATE.mousePosition.y) / this.height) * N + 1;
         const dt = CONFIG.UPDATE_INTERVAL / 1000;
@@ -138,11 +134,7 @@ export class FluidSolver {
     // Stam's advect (semi-Lagrangian)
     advect(b, outputBuffer, inputBuffer, velocityBuffer, N = CONFIG.N, GRID_SIZE = CONFIG.GRID_SIZE) {
         const isDensity = (outputBuffer === this.buffers.densityBuffers[0] || outputBuffer === this.buffers.densityBuffers[1]);
-
-        // For density advection, pass velocity N in diffuse parameter for resolution mapping
         const velN = isDensity ? CONFIG.N : 0;
-
-        // Set uniforms - for density, diffuse field contains velocity N, viscosity field contains decay
         const mouseX = (STATE.mousePosition.x / this.width) * N + 1;
         const mouseY = ((this.height - STATE.mousePosition.y) / this.height) * N + 1;
         const dt = CONFIG.UPDATE_INTERVAL / 1000;
@@ -175,7 +167,6 @@ export class FluidSolver {
         computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
         computePass.end();
 
-        // Pass velN and decayValue to setBoundary so it preserves them in uniforms
         this.setBoundary(encoder, b, outputBuffer, N, GRID_SIZE, isDensity ? velN : null, isDensity ? decayValue : null);
         this.device.queue.submit([encoder.finish()]);
     }
@@ -250,30 +241,6 @@ export class FluidSolver {
         this.device.queue.submit([encoder.finish()]);
     }
 
-    applyGravity(velocityBuffer) {
-        if (CONFIG.GRAVITY === 0) return;
-
-        const workgroupCount = Math.ceil(CONFIG.N / CONFIG.WORKGROUP_SIZE);
-        const bufferIndex = (velocityBuffer === this.buffers.velocityBuffers[0]) ? 0 : 1;
-
-        const gravityUniform = new Float32Array([
-            0, 0,
-            CONFIG.GRID_SIZE, CONFIG.GRID_SIZE,
-            0, CONFIG.GRAVITY,
-            CONFIG.N, CONFIG.UPDATE_INTERVAL / 1000,
-            0, 0
-        ]);
-        this.device.queue.writeBuffer(this.buffers.uniformBuffer, 0, gravityUniform);
-
-        const encoder = this.device.createCommandEncoder();
-        const computePass = encoder.beginComputePass();
-        computePass.setPipeline(this.pipelines.gravity.program);
-        computePass.setBindGroup(0, this.bindGroups.gravity[bufferIndex]);
-        computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
-        computePass.end();
-
-        this.device.queue.submit([encoder.finish()]);
-    }
 
     updateVelocity() {
         STATE.diffuseState = CONFIG.VISCOSITY;
@@ -320,7 +287,6 @@ export class FluidSolver {
         this.project(velocityBuffers[STATE.velocityStep % 2],
                      velocityBuffers[(STATE.velocityStep + 1) % 2]);
 
-        this.applyGravity(velocityBuffers[STATE.velocityStep % 2]);
         this.applyVorticityConfinement(velocityBuffers[STATE.velocityStep % 2]);
     }
 

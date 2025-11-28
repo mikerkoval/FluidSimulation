@@ -1,7 +1,7 @@
 import { CONFIG, STATE } from '../core/config.js';
 
 export class FluidRenderer {
-    
+
     constructor(device, context, buffers, pipelines, bindGroups, vertexBuffer, bloomTextures) {
         this.device = device;
         this.context = context;
@@ -20,9 +20,8 @@ export class FluidRenderer {
         if (buffer === this.buffers.densityBuffers[0]) bindGroupIndex = 0;
         else if (buffer === this.buffers.densityBuffers[1]) bindGroupIndex = 1;
         else if (buffer === this.buffers.velocityBuffers[0]) bindGroupIndex = 2;
-        else bindGroupIndex = 3; // velocityBuffers[1]
+        else bindGroupIndex = 3;
 
-        // Set uniforms with appropriate N value for the buffer type
         const N = isDensity ? CONFIG.DYE_N : CONFIG.N;
         const GRID_SIZE = isDensity ? CONFIG.DYE_GRID_SIZE : CONFIG.GRID_SIZE;
         const uniformArray = new Float32Array([
@@ -63,7 +62,6 @@ export class FluidRenderer {
 
         pass.setPipeline(this.pipelines.drawTexture.program);
         pass.setVertexBuffer(0, this.vertexBuffer);
-        // Use bloomed texture if bloom is enabled, otherwise use original
         const bindGroup = (CONFIG.ENABLE_BLOOM && this.bloomTextures && this.bindGroups.drawBloomTexture)
             ? this.bindGroups.drawBloomTexture
             : this.bindGroups.drawTexture;
@@ -82,9 +80,8 @@ export class FluidRenderer {
         if (buffer === this.buffers.densityBuffers[0]) bindGroupIndex = 0;
         else if (buffer === this.buffers.densityBuffers[1]) bindGroupIndex = 1;
         else if (buffer === this.buffers.velocityBuffers[0]) bindGroupIndex = 2;
-        else bindGroupIndex = 3; // velocityBuffers[1]
+        else bindGroupIndex = 3;
 
-        // Set uniforms with appropriate N value for the buffer type
         const N = isDensity ? CONFIG.DYE_N : CONFIG.N;
         const GRID_SIZE = isDensity ? CONFIG.DYE_GRID_SIZE : CONFIG.GRID_SIZE;
         const uniformArray = new Float32Array([

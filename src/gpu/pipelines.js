@@ -257,28 +257,6 @@ export function createPipelines(device, canvasFormat, vertexBufferLayout) {
         })
     };
 
-    const gravityModule = device.createShaderModule({
-        label: "gravity shader",
-        code: shaders.gravity
-    });
-
-    const gravityLayout = device.createBindGroupLayout({
-        label: "Gravity Bind Group Layout",
-        entries: [
-            { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {} },
-            { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage"} }
-        ]
-    });
-
-    pipelines.gravity = {
-        layout: gravityLayout,
-        program: device.createComputePipeline({
-            label: "gravity pipeline",
-            layout: device.createPipelineLayout({ bindGroupLayouts: [gravityLayout] }),
-            compute: { module: gravityModule, entryPoint: "computeMain" }
-        })
-    };
-
     // Bloom Extract Pipeline
     const bloomExtractModule = device.createShaderModule({
         label: "bloom extract shader",

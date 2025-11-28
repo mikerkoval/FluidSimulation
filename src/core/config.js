@@ -2,7 +2,6 @@ export const CONFIG = {
     DIFFUSE: 0.0,
     VISCOSITY: 0,
     VORTICITY: 0.05,
-    GRAVITY: 0,
     VELOCITY_DECAY: 1.0,
     DENSITY_DECAY: 0.99,  // Fade of colors over time
     N: 64,  // Velocity simulation resolution
@@ -17,7 +16,7 @@ export const CONFIG = {
     DRAW_DENSITY: 1,
     DRAW_VELOCITY: 2,
     SOLVER_ITERATIONS: 5,  // Number of iterations for diffuse and project solvers
-    DISPLAY_RESOLUTION: 128,
+    DISPLAY_RESOLUTION: 512,
     SHOW_FPS: true,
     ENABLE_BLOOM: true  // Toggle bloom effect
 };

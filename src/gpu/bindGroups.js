@@ -371,25 +371,6 @@ export function createBindGroups(device, buffers, pipelines, texture, sampler, b
         })
     ];
 
-    bindGroups.gravity = [
-        device.createBindGroup({
-            label: "Gravity 0 bind group",
-            layout: pipelines.gravity.layout,
-            entries: [
-                { binding: 0, resource: { buffer: buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: buffers.velocityBuffers[0] } }
-            ]
-        }),
-        device.createBindGroup({
-            label: "Gravity 1 bind group",
-            layout: pipelines.gravity.layout,
-            entries: [
-                { binding: 0, resource: { buffer: buffers.uniformBuffer } },
-                { binding: 1, resource: { buffer: buffers.velocityBuffers[1] } }
-            ]
-        })
-    ];
-
     // Bloom bind groups
     if (bloomTextures) {
         // Extract bright areas from main texture

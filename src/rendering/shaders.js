@@ -21,27 +21,22 @@ export function createShaderCode(WORKGROUP_SIZE) {
     fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
         let texDims = textureDimensions(out_texture);
 
-        // Bounds check
         if (global_id.x >= texDims.x || global_id.y >= texDims.y) {
             return;
         }
 
-        // Determine grid size from buffer length
         let bufferSize = arrayLength(&stateIn);
         let gridSizePlusBoundary = u32(sqrt(f32(bufferSize)));
         let N = f32(gridSizePlusBoundary - 2);
 
-        // Scale texture coordinates to grid coordinates
         let simX = (f32(global_id.x) / f32(texDims.x)) * N;
         let simY = (f32(global_id.y) / f32(texDims.y)) * N;
 
-        // Clamp to valid simulation bounds
         if (simX < 0.0 || simX >= N || simY < 0.0 || simY >= N) {
             textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), vec4<f32>(0.0, 0.0, 0.0, 1.0));
             return;
         }
 
-        // Bilinear interpolation
         let x0 = u32(floor(simX));
         let y0 = u32(floor(simY));
         let x1 = min(x0 + 1, u32(N) - 1);
@@ -56,7 +51,6 @@ export function createShaderCode(WORKGROUP_SIZE) {
         let c01 = stateIn[(y1 + 1) * gridWidth + (x0 + 1)];
         let c11 = stateIn[(y1 + 1) * gridWidth + (x1 + 1)];
 
-        // Bilinear blend
         let c0 = mix(c00, c10, fx);
         let c1 = mix(c01, c11, fx);
         var color = mix(c0, c1, fy);
@@ -166,12 +160,10 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 var index = (global_id.x + 1) + u32(uniforms.grid_size.x) * (global_id.y + 1);
                 stateOut[index] = stateIn[index];
 
-                // Gaussian splat: smooth falloff based on distance
+                // Gaussian splat for smooth color falloff
                 let dist = length(vec2f(uniforms.mouse) - vec2f((vec2f(global_id.xy) + vec2f(1))));
-                let sigma = source.radius * 0.5; // Control spread
+                let sigma = source.radius * 0.5;
                 let gaussian = exp(-(dist * dist) / (2.0 * sigma * sigma));
-
-                // Apply Gaussian-weighted color addition
                 stateOut[index] += source.color * gaussian;
             }
         `,
@@ -202,17 +194,14 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 if(f32(i) >= uniforms.grid_size.x) { return; }
                 if(f32(j) >= uniforms.grid_size.y) { return; }
 
-                // Free-slip boundaries: b=0 for density, b=1 for u (horizontal vel), b=2 for v (vertical vel)
-                // Free-slip allows tangential flow along walls, only reflects normal component
+                // Free-slip boundaries: b=0 for density, b=1 for x-velocity, b=2 for y-velocity
 
-                // Left and right walls (i=0 and i=N+1)
+                // Left and right walls
                 if(i == 0 && j >= 1 && j <= N) {
                     var neighbor = arr[IX(1, j)];
                     if(u32(uniforms.b) == 1) {
-                        // Reflect x component (perpendicular to wall), copy y component (parallel to wall)
                         arr[index] = vec4f(-neighbor.x, neighbor.y, neighbor.z, neighbor.w);
                     } else {
-                        // For density and y-velocity, just copy
                         arr[index] = neighbor;
                     }
                     return;
@@ -220,23 +209,19 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 if(i == u32(N + 1) && j >= 1 && j <= N) {
                     var neighbor = arr[IX(N, j)];
                     if(u32(uniforms.b) == 1) {
-                        // Reflect x component (perpendicular to wall), copy y component (parallel to wall)
                         arr[index] = vec4f(-neighbor.x, neighbor.y, neighbor.z, neighbor.w);
                     } else {
-                        // For density and y-velocity, just copy
                         arr[index] = neighbor;
                     }
                     return;
                 }
 
-                // Top and bottom walls (j=0 and j=N+1)
+                // Top and bottom walls
                 if(j == 0 && i >= 1 && i <= N) {
                     var neighbor = arr[IX(i, 1)];
                     if(u32(uniforms.b) == 2) {
-                        // Reflect y component (perpendicular to wall), copy x component (parallel to wall)
                         arr[index] = vec4f(neighbor.x, -neighbor.y, neighbor.z, neighbor.w);
                     } else {
-                        // For density and x-velocity, just copy
                         arr[index] = neighbor;
                     }
                     return;
@@ -244,16 +229,14 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 if(j == u32(N + 1) && i >= 1 && i <= N) {
                     var neighbor = arr[IX(i, N)];
                     if(u32(uniforms.b) == 2) {
-                        // Reflect y component (perpendicular to wall), copy x component (parallel to wall)
                         arr[index] = vec4f(neighbor.x, -neighbor.y, neighbor.z, neighbor.w);
                     } else {
-                        // For density and x-velocity, just copy
                         arr[index] = neighbor;
                     }
                     return;
                 }
 
-                // Corners - average of adjacent cells
+                // Corners
                 if(i == 0 && j == 0) {
                     arr[index] = (arr[IX(1, 0)] + arr[IX(0, 1)]) * 0.5;
                     return;
@@ -287,7 +270,6 @@ export function createShaderCode(WORKGROUP_SIZE) {
 
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                // Direct index calculation with +1 offset for boundary
                 let i = global_id.x + 1;
                 let j = global_id.y + 1;
                 let grid_width = u32(uniforms.grid_size.x);
@@ -328,16 +310,13 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let j = f32(global_id.y + 1);
                 let idx = u32(j) * grid_width + u32(i);
 
-                // Sample velocity - map current position to velocity grid
-                // For density (high res) advecting with velocity (low res), scale coordinates
-                // uniforms.diffuse is repurposed to hold velocity N when needed
+                // Sample velocity, mapping between different grid resolutions if needed
                 let vel_N = uniforms.diffuse;
                 let use_scaled_vel = (vel_N > 0.0 && vel_N != uniforms.N);
 
                 var velocity: vec4f;
                 if (use_scaled_vel) {
-                    // Map from density grid [1, dye_N] to velocity grid [1, vel_N]
-                    // Normalize position within grid (0 to 1), then map to velocity grid
+                    // Map density grid coordinates to velocity grid coordinates
                     let i_normalized = (i - 1.0) / (uniforms.N - 1.0);
                     let j_normalized = (j - 1.0) / (uniforms.N - 1.0);
                     let i_vel = 1.0 + i_normalized * (vel_N - 1.0);
@@ -360,14 +339,13 @@ export function createShaderCode(WORKGROUP_SIZE) {
 
                     velocity = mix(mix(v00, v10, tx), mix(v01, v11, tx), ty);
                 } else {
-                    // Same resolution - direct lookup
                     velocity = uv[idx];
                 }
 
                 // dt0 = dt * N
                 let dt0 = uniforms.dt * uniforms.N;
 
-                // Backtrace: find where this particle came from
+                // Backtrace using semi-Lagrangian advection
                 var x = i - dt0 * velocity.x;
                 var y = j - dt0 * velocity.y;
 
@@ -392,8 +370,7 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 var result = s0 * (t0 * d0[j0 * grid_width + i0] + t1 * d0[j1 * grid_width + i0]) +
                              s1 * (t0 * d0[j0 * grid_width + i1] + t1 * d0[j1 * grid_width + i1]);
 
-                // Apply decay to density (b=0), but not velocity (b=1)
-                // Use viscosity field to pass density decay value
+                // Apply decay to density only
                 if (uniforms.b == 0.0) {
                     result *= uniforms.viscosity;
                 }
@@ -416,16 +393,12 @@ export function createShaderCode(WORKGROUP_SIZE) {
 
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                // Direct index calculation with +1 offset for boundary
                 let i = global_id.x + 1;
                 let j = global_id.y + 1;
                 let grid_width = u32(uniforms.grid_size.x);
                 let idx = j * grid_width + i;
 
-                // Precompute coefficient: -0.5 * h where h = 1/N
                 let coeff = -0.5 / uniforms.N;
-
-                // Precompute neighbor indices
                 let idx_left = idx - 1;
                 let idx_right = idx + 1;
                 let idx_bottom = idx - grid_width;
@@ -452,21 +425,16 @@ export function createShaderCode(WORKGROUP_SIZE) {
 
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                // Direct index calculation with +1 offset for boundary
                 let i = global_id.x + 1;
                 let j = global_id.y + 1;
                 let grid_width = u32(uniforms.grid_size.x);
                 let idx = j * grid_width + i;
-
-                // Precompute neighbor indices
                 let idx_center = idx;
                 let idx_left = idx - 1;
                 let idx_right = idx + 1;
                 let idx_bottom = idx - grid_width;
                 let idx_top = idx + grid_width;
 
-                // Average: (center.y + left.x + right.x + bottom.x + top.x) / 4
-                // Use multiplication instead of division for performance
                 p_div[idx_center].x = (p_div[idx_center].y + p_div[idx_left].x +
                                        p_div[idx_right].x + p_div[idx_bottom].x +
                                        p_div[idx_top].x) * 0.25;
@@ -487,16 +455,11 @@ export function createShaderCode(WORKGROUP_SIZE) {
 
             @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
             fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                // Direct index calculation with +1 offset for boundary
                 let i = global_id.x + 1;
                 let j = global_id.y + 1;
                 let grid_width = u32(uniforms.grid_size.x);
                 let idx = j * grid_width + i;
-
-                // Precompute coefficient: -1.0 / h where h = 1/N, so this is -N
                 let coeff = -uniforms.N;
-
-                // Precompute neighbor indices
                 let idx_left = idx - 1;
                 let idx_right = idx + 1;
                 let idx_bottom = idx - grid_width;
@@ -535,8 +498,7 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let idx_bottom = idx - grid_width;
                 let idx_top = idx + grid_width;
 
-                // Vorticity = curl of velocity field = dv/dx - du/dy
-                // Central difference: (f(x+h) - f(x-h)) / (2h), where h = 1/N
+                // Curl of velocity field
                 let h = 1.0 / uniforms.N;
                 let du_dy = (uv[idx_top].x - uv[idx_bottom].x) / (2.0 * h);
                 let dv_dx = (uv[idx_right].y - uv[idx_left].y) / (2.0 * h);
@@ -572,7 +534,6 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let idx_bottom = idx - grid_width;
                 let idx_top = idx + grid_width;
 
-                // Gradient of vorticity magnitude: ∇|ω|
                 let h = 1.0 / uniforms.N;
                 let dw_dx = (abs(vort[idx_right].x) - abs(vort[idx_left].x)) / (2.0 * h);
                 let dw_dy = (abs(vort[idx_top].x) - abs(vort[idx_bottom].x)) / (2.0 * h);
@@ -581,42 +542,11 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let force_x = (dw_dy / length) * vort[idx].x;
                 let force_y = -(dw_dx / length) * vort[idx].x;
 
-                // Apply vorticity confinement force
                 uv[idx].x += uniforms.visc * uniforms.dt * force_x;
                 uv[idx].y += uniforms.visc * uniforms.dt * force_y;
             }
         `,
 
-        gravity: `
-            struct Uniforms {
-                mouse: vec2f,
-                grid_size: vec2f,
-                diff: f32, visc: f32,
-                N: f32, dt: f32, b: f32,
-            };
-
-            @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-            @group(0) @binding(1) var<storage, read_write> uv: array<vec4f>;
-
-            @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
-            fn computeMain(@builtin(global_invocation_id) global_id: vec3u) {
-                let N = u32(uniforms.N);
-                let x = global_id.x + 1;
-                let y = global_id.y + 1;
-
-                if (x > N || y > N) { return; }
-
-                let grid_width = u32(uniforms.grid_size.x);
-                let idx = y * grid_width + x;
-
-                // Apply gravity force to vertical velocity (y-component)
-                // uniforms.visc contains the gravity strength
-                // Negative y is downward in this coordinate system
-                uv[idx].y -= uniforms.visc * uniforms.dt * 0.3;
-            }
-        `,
-
-        // Bloom pass 1: Extract bright colors
         bloomExtract: `
             @group(0) @binding(0) var inputTexture: texture_2d<f32>;
             @group(0) @binding(1) var outputTexture: texture_storage_2d<rgba16float, write>;
@@ -629,7 +559,6 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let coords = vec2i(global_id.xy);
                 let color = textureLoad(inputTexture, coords, 0);
 
-                // Extract bright areas (threshold)
                 let brightness = dot(color.rgb, vec3f(0.2126, 0.7152, 0.0722));
                 let threshold = 0.1;
 
@@ -641,7 +570,6 @@ export function createShaderCode(WORKGROUP_SIZE) {
             }
         `,
 
-        // Bloom pass 2: Horizontal blur
         bloomBlurH: `
             @group(0) @binding(0) var inputTexture: texture_2d<f32>;
             @group(0) @binding(1) var outputTexture: texture_storage_2d<rgba16float, write>;
@@ -652,8 +580,6 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 if (global_id.x >= dims.x || global_id.y >= dims.y) { return; }
 
                 let coords = vec2i(global_id.xy);
-
-                // 5-tap Gaussian blur horizontally
                 let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
                 var result = textureLoad(inputTexture, coords, 0) * weights[0];
 
@@ -667,7 +593,6 @@ export function createShaderCode(WORKGROUP_SIZE) {
             }
         `,
 
-        // Bloom pass 3: Vertical blur
         bloomBlurV: `
             @group(0) @binding(0) var inputTexture: texture_2d<f32>;
             @group(0) @binding(1) var outputTexture: texture_storage_2d<rgba16float, write>;
@@ -678,8 +603,6 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 if (global_id.x >= dims.x || global_id.y >= dims.y) { return; }
 
                 let coords = vec2i(global_id.xy);
-
-                // 5-tap Gaussian blur vertically
                 let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
                 var result = textureLoad(inputTexture, coords, 0) * weights[0];
 
@@ -693,7 +616,6 @@ export function createShaderCode(WORKGROUP_SIZE) {
             }
         `,
 
-        // Bloom pass 4: Composite (add bloom to original)
         bloomComposite: `
             @group(0) @binding(0) var originalTexture: texture_2d<f32>;
             @group(0) @binding(1) var bloomTexture: texture_2d<f32>;
@@ -707,8 +629,6 @@ export function createShaderCode(WORKGROUP_SIZE) {
                 let coords = vec2i(global_id.xy);
                 let original = textureLoad(originalTexture, coords, 0);
                 let bloom = textureLoad(bloomTexture, coords, 0);
-
-                // Add bloom with intensity
                 let bloomIntensity = 1.5;
                 let result = original + bloom * bloomIntensity;
 
